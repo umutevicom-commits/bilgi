@@ -8,6 +8,7 @@ import type { GameSession, Category } from '../types'
 import {
   Play, Trophy, LogOut, LogIn, User, Crown, Star, Zap, BookOpen, Globe,
   Calculator, Newspaper, Car, Map, FlaskConical, Landmark, GraduationCap, Shuffle,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -146,23 +147,34 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-          {isGuest ? (
-            <button
-              onClick={() => navigate('/auth')}
-              className="btn-accent text-sm flex items-center gap-1"
-            >
-              <LogIn size={16} />
-              <span>Giriş Yap</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => signOut()}
-              className="btn-ghost text-sm flex items-center gap-1"
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Çıkış</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {profile?.is_admin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="btn-accent text-sm flex items-center gap-1"
+              >
+                <Shield size={16} />
+                <span className="hidden sm:inline">Admin Paneli</span>
+              </button>
+            )}
+            {isGuest ? (
+              <button
+                onClick={() => navigate('/auth')}
+                className="btn-accent text-sm flex items-center gap-1"
+              >
+                <LogIn size={16} />
+                <span>Giriş Yap</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => signOut()}
+                className="btn-ghost text-sm flex items-center gap-1"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Çıkış</span>
+              </button>
+            )}
+          </div>
       </motion.header>
 
       {/* Title */}
