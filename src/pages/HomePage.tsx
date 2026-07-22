@@ -185,7 +185,7 @@ export default function HomePage() {
         className="text-center mb-8"
       >
         <h1 className="text-4xl sm:text-5xl font-bold text-cream-100 mb-2 text-balance">
-          Kim Milyoner Olmak İster
+          Bilgi Yarışması
         </h1>
         <p className="text-primary-300">Bilgi yarışması - Sonsuz soru, puan sistemi</p>
       </motion.div>
@@ -288,7 +288,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <div className="text-center text-primary-500 text-xs mt-12">
-        <p>kimmilyoner.eu.cc</p>
+        <p>Game Developer: Hamdi Uludağ</p>
       </div>
     </div>
   )
