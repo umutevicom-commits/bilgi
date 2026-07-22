@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { AdBanner } from '../components/AdBanner'
 import type { GameSession, Category } from '../types'
 import {
-  Play, Trophy, LogOut, User, Crown, Star, Zap, BookOpen, Globe,
+  Play, Trophy, LogOut, LogIn, User, Crown, Star, Zap, BookOpen, Globe,
   Calculator, Newspaper, Car, Map, FlaskConical, Landmark, GraduationCap, Shuffle,
   type LucideIcon,
 } from 'lucide-react'
@@ -26,7 +26,8 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
+  const isGuest = !user
   const [hasBreakSession, setHasBreakSession] = useState(false)
   const [breakSession, setBreakSession] = useState<GameSession | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
@@ -65,6 +66,10 @@ export default function HomePage() {
   }, [])
 
   const handleStartGame = () => {
+    if (isGuest) {
+      navigate('/auth')
+      return
+    }
     if (hasBreakSession) {
       setShowCategorySelect(false)
       navigate(`/game?resume=true`)
@@ -74,11 +79,19 @@ export default function HomePage() {
   }
 
   const handleCategorySelect = (slug: string) => {
+    if (isGuest) {
+      navigate('/auth')
+      return
+    }
     setSelectedCategory(slug)
     navigate(`/game?category=${slug}`)
   }
 
   const handleContinue = () => {
+    if (isGuest) {
+      navigate('/auth')
+      return
+    }
     navigate(`/game?resume=true`)
   }
 
@@ -122,7 +135,7 @@ export default function HomePage() {
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-cream-100">{profile?.username}</h2>
+              <h2 className="text-lg font-semibold text-cream-100">{profile?.username || 'Misafir'}</h2>
               {getBadge()}
             </div>
             <div className="flex items-center gap-1 text-sm">
@@ -133,13 +146,23 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => signOut()}
-          className="btn-ghost text-sm flex items-center gap-1"
-        >
-          <LogOut size={16} />
-          <span className="hidden sm:inline">Çıkış</span>
-        </button>
+          {isGuest ? (
+            <button
+              onClick={() => navigate('/auth')}
+              className="btn-accent text-sm flex items-center gap-1"
+            >
+              <LogIn size={16} />
+              <span>Giriş Yap</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => signOut()}
+              className="btn-ghost text-sm flex items-center gap-1"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Çıkış</span>
+            </button>
+          )}
       </motion.header>
 
       {/* Title */}
@@ -162,7 +185,7 @@ export default function HomePage() {
 
       {/* Action Buttons */}
       <div className="space-y-4 mb-8">
-        {hasBreakSession && breakSession && (
+        {hasBreakSession && breakSession && !isGuest && (
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -186,7 +209,7 @@ export default function HomePage() {
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg"
         >
           <Zap size={24} />
-          {hasBreakSession ? 'Yeni Oyun Başlat' : 'Oyuna Başla'}
+          {isGuest ? 'Giriş Yap & Oyna' : hasBreakSession ? 'Yeni Oyun Başlat' : 'Oyuna Başla'}
         </motion.button>
 
         <motion.button

@@ -12,19 +12,11 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/" element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        } />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/game" element={
           <ProtectedRoute>
             <GamePage />
-          </ProtectedRoute>
-        } />
-        <Route path="/leaderboard" element={
-          <ProtectedRoute>
-            <LeaderboardPage />
           </ProtectedRoute>
         } />
         <Route path="/admin" element={
