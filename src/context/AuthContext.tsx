@@ -8,10 +8,12 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
+  passwordRecovery: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, username: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: string | null }>
   refreshProfile: () => Promise<void>
 }
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -57,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true)
+        }
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {
@@ -110,7 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}auth`
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    return { error: error?.message ?? null }
+  }
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
     return { error: error?.message ?? null }
   }
 
@@ -133,10 +145,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         loading,
+        passwordRecovery,
         signIn,
         signUp,
         signOut,
         resetPassword,
+        updatePassword,
         updateProfile,
         refreshProfile,
       }}
