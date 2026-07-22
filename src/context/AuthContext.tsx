@@ -94,12 +94,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { data: { username } },
     })
-    if (error) return { error: error.message }
+    if (error) {
+      // Supabase bazen ayrıntısız/boş bir hata gövdesi döndürebiliyor
+      // (ör. e-posta zaten kayıtlı, SMTP hatası, RLS/trigger hatası vb.).
+      // Teşhis kolaylığı için tam hatayı konsola basıyoruz ve kullanıcıya
+      // her zaman okunabilir bir metin gösteriyoruz.
+      console.error('SignUp error (full):', error)
+      const message =
+        error.message && error.message.trim().length > 0 && error.message !== '{}'
+          ? error.message
+          : `Kayıt başarısız (status: ${('status' in error && (error as any).status) || 'bilinmiyor'}). Lütfen Supabase Authentication > Logs bölümünden ayrıntıyı kontrol edin.`
+      return { error: message }
+    }
     if (data.user) {
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ is_online: true, last_seen: new Date().toISOString() })
         .eq('id', data.user.id)
+      if (profileError) {
+        console.error('Profile update after signUp failed:', profileError)
+      }
     }
     return { error: null }
   }
