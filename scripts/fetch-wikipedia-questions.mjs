@@ -16,85 +16,301 @@ const WIKI_SEARCH_API = 'https://tr.wikipedia.org/w/api.php'
 const WIKI_RANDOM_API = 'https://tr.wikipedia.org/api/rest_v1/page/random/summary'
 
 // ============================================
-// KATEGORİ / KONU HAVUZU (derinlemesine tarama için genişletildi)
+// KATEGORİ / KONU HAVUZU (5.000+ Sınırsız, Saf Türkçe ve Yerli Kapsam)
 // ============================================
 const CATEGORIES = [
   {
     slug: 'genel-kultur',
     topics: [
-      'Türkiye', 'Osmanlı İmparatorluğu', 'Mustafa Kemal Atatürk', 'İstanbul', 'Ankara',
-      'Türk kültürü', 'Sanat', 'Müzik', 'Türk edebiyatı', 'Sinema', 'Tiyatro',
-      'Nazım Hikmet', 'Yaşar Kemal', 'Orhan Pamuk', 'Türk mutfağı', 'Halk müziği',
-      'Geleneksel Türk sanatları', 'Mimar Sinan', 'Türk halk oyunları',
-    ],
+      // 1. Şehirler, İlçeler ve Bölgeler (81 İl ve Önemli İlçeler)
+      'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın', 'Balıkesir',
+      'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli',
+      'Diyarbakır', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari',
+      'Hatay', 'Isparta', 'Mersin', 'İstanbul', 'İzmir', 'Kars', 'Kastamonu', 'Kayseri', 'Kırklareli', 'Kırşehir',
+      'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Kahramanmaraş', 'Mardin', 'Muğla', 'Muş', 'Nevşehir',
+      'Niğde', 'Ordu', 'Rize', 'Sakarya', 'Samsun', 'Siirt', 'Sinop', 'Sivas', 'Tekirdağ', 'Tokat',
+      'Trabzon', 'Tunceli', 'Şanlıurfa', 'Uşak', 'Van', 'Yozgat', 'Zonguldak', 'Aksaray', 'Bayburt', 'Karaman',
+      'Kırıkkale', 'Batman', 'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük', 'Kilis', 'Osmaniye', 'Düzce',
+      'Alanya', 'Tarsus', 'İskenderun', 'Dörtyol', 'Payas', 'Samandağ', 'Kırıkhan', 'Reyhanlı', 'Elbistan', 'Nazilli',
+      'Bandırma', 'İnegöl', 'Alaplı', 'Çorlu', 'Gebze', 'Tarsus', 'Manavgat', 'Bodrum', 'Marmaris', 'Fethiye',
+      
+      // 2. Tarihi Yerler, Antik Kentler ve Ören Yeri (Türkiye Odaklı)
+      'Göbeklitepe', 'Efes Antik Kenti', 'Kapadokya', 'Pamukkale', 'Nemrut Dağı', 'Topkapı Sarayı', 'Ayasofya',
+      'Sultanahmet Camii', 'Sümela Manastırı', 'Safranbolu evleri', 'Cumalıkızık', 'Truva Antik Kenti', 'Hattuşaş',
+      'Hierapolis', 'Pergamon', 'Aspendos', 'Side Antik Kenti', 'Milet Antik Kenti', 'Didyma', 'Priene',
+      'Çatalhöyük', 'Alacahöyük', 'Yerebatan Sarnıcı', 'Dolmabahçe Sarayı', 'İshak Paşa Sarayı', 'Divriği Ulu Cami',
+      'Ani Harabeleri', 'Zeugma Mozaik Müzesi', 'Göreme Açık Hava Müzesi', 'Ihlara Vadisi', 'Uçhisar Kalesi',
+      'Kız Kulesi', 'Galata Kulesi', 'Rumeli Hisarı', 'Anadolu Hisarı', 'Yedikule Hisarları', 'Süleymaniye Camii',
+      'Selimiye Camii', 'Yeşil Cami', 'Eski Cami', 'Muradiye Külliyesi', 'Bursa Ulu Cami', 'Erzurum Çifte Minareli Medrese',
+      'Yakutiye Medresesi', 'Sivas Gök Medrese', 'Karatay Medresesi', 'İnce Minareli Medrese', 'Mevlana Müzesi',
+      
+      // 3. Türk Edebiyatı, Şairler ve Yazarlar
+      'Nazım Hikmet', 'Yaşar Kemal', 'Orhan Pamuk', 'Ahmet Hamdi Tanpınar', 'Sabahattin Ali', 'Halide Edip Adıvar',
+      'Reşat Nuri Güntekin', 'Yahya Kemal Beyatlı', 'Atilla İlhan', 'Cemal Süreya', 'Edip Cansever', 'Turgut Uyar',
+      'İlhan Berk', 'Sezai Karakoç', 'Cahit Zarifoğlu', 'Ahmet Arif', 'Oğuz Atay', 'Buket Uzuner', 'Zülfü Livaneli',
+      'Peyami Safa', 'Yakup Kadri Karaosmanoğlu', 'Refik Halit Karay', 'Memduh Şevket Esendal', 'Sait Faik Abasıyanık',
+      'Tarık Buğra', 'Kemal Tahir', 'Orhan Kemal', 'Fakir Baykurt', 'Dursun Akçam', 'Talip Apaydın',
+      'Samim Kocagöz', 'Aziz Nesin', 'Rıfat Ilgaz', 'Hüseyin Rahmi Gürpınar', 'Namık Kemal', 'Şinasi', 'Ziya Paşa',
+      'Ahmet Vefik Paşa', 'Muallim Naci', 'Recaizade Mahmud Ekrem', 'Abdülhak Hamid Tarhan', 'Tevfik Fikret',
+      'Mehmet Akif Ersoy', 'Ziya Gökalp', 'Ömer Seyfettin', 'Faruk Nafiz Çamlıbel', 'Halit Fahri Ozansoy',
+      'Yusuf Ziya Ortaç', 'Orhan Seyfi Orhon', 'Enis Behiç Koryürek', 'Ahmet Kutsi Tecer', 'Necip Fazıl Kısakürek',
+      'Asaf Halet Çelebi', 'Behçet Necatigil', 'Cahit Sıtkı Tarancı', 'Ahmet Muhip Dıranas', 'Fazıl Hüsnü Dağlarca',
+      'Oktay Rifat', 'Melih Cevdet Anday', 'Atilla İlhan', 'Ümit Yaşar Oğuzcan', 'Cengiz Aytmatov', 'Elif Şafak',
+      'Ahmet Ümit', 'Orhan Kemal', 'Yakup Kadri', 'Halide Edip', 'Refik Halit', 'Memduh Şevket', 'Sait Faik',
+      
+      // 4. Halk Edebiyatı, Ozanlar ve Destanlar
+      'Yunus Emre', 'Mevlana Celaleddin-i Rumi', 'Nasreddin Hoca', 'Dede Korkut', 'Karacaoğlan', 'Köroğlu',
+      'Dadaloğlu', 'Pir Sultan Abdal', 'Seyrani', 'Kaygusuz Abdal', 'Aşık Veysel', 'Neşet Ertaş', 'Mahzuni Şerif',
+      'Abdrahim Karakoç', 'Bedri Rahmi Eyüboğlu', 'Manas Destanı', 'Ergenekon Destanı', 'Türeyiş Destanı',
+      'Göç Destanı', 'Şu Destanı', 'Bozkurt Destanı', 'Ouz Kağan Destanı', 'Köroğlu Destanı', 'Battal Gazi Destanı',
+      'Dede Korkut Hikayeleri', 'Nasreddin Hoca Fıkraları', 'Yunus Emre İlahileri', 'Karacaoğlan Türküleri',
+      
+      // 5. Türk Sanatları, Gelenekler ve Kültür
+      'Ebru sanatı', 'Hat sanatı', 'Tezhip', 'Miniatür', 'Çini sanatı', 'Halı dokumacılığı', 'Bakırcılık',
+      'Oltu taşı', 'Lüle taşı', 'Camaltı sanatları', 'Ahşap oymacılığı', 'Sedekari', 'Keçe yapımı', 'Dokuma sanatları',
+      'Karagöz ve Hacivat', 'Meddah', 'Orta oyunu', 'Halk oyunları', 'Zeybek', 'Horon', 'Halay', 'Bar',
+      'Kafkas', 'Karşılama', 'Kaşık havası', 'Hançer barı', 'Bengü', 'Atabarı', 'Demircilik', 'Nalbantlık',
+      'Ahilik teşkilatı', 'Geleneksel Türk mimarisi', 'Osmanlı konakları', 'Kervansaraylar', 'Hamam kültürü',
+      'Bedestenler', 'Sadırvanlar', 'Türbeler', 'Külliyeler', 'Medreseler', 'Şifahâneler', 'Türk kahvesi',
+      'Türk lokumu', 'Baklava', 'Mantı', 'İskender kebap', 'Döner', 'Lahmacun', 'Künefe', 'Simit', 'Ayran',
+      'Rakı', 'Türk çayı', 'Ney', 'Bağlama', 'Kemençe', 'Zurna', 'Davul', 'Klarnet', 'Kanun', 'Ud', 'Tanbur',
+      'Rebab', 'Kabak kemane', 'Sipsi', 'Cümbüş', 'Mey', 'Kaval', 'Çifte', 'Tulum', 'Zilli maşa', 'Darbuka',
+      
+      // 6. Türk Tarihi ve Siyasi Dönemler
+      'Osmanlı İmparatorluğu', 'Selçuklu Devleti', 'Büyük Selçuklu İmparatorluğu', 'Anadolu Selçuklu Devleti',
+      'Türkiye Cumhuriyeti', 'Mustafa Kemal Atatürk', 'Kurtuluş Savaşı', 'Cumhuriyetin ilanı', 'Büyük Taarruz',
+      'Sakarya Meydan Savaşı', 'Amasya Genelgesi', 'Erzurum Kongresi', 'Sivas Kongresi', 'Misak-ı Millî',
+      'Saltanatın Kaldırılması', 'Halifeliğin Kaldırılması', 'Harf İnkılabı', 'Kıyafet Kanunu', 'Soyadı Kanunu',
+      'Kadınlara Seçme ve Seçilme Hakkı', 'Türk Tarih Kurumu', 'Türk Dil Kurumu', 'Medeni Kanun', 'Kabotaj Kanunu',
+      'Teşviki Sanayi Kanunu', 'Aşar Vergisinin Kaldırılması', 'Osmanlı Kuruluş Dönemi', 'Osmanlı Yükselme Dönemi',
+      'Osmanlı Duraklama Dönemi', 'Osmanlı Gerileme Dönemi', 'Osmanlı Dağılma Dönemi', 'Tanzimat Fermanı',
+      'Islahat Fermanı', 'I. Meşrutiyet', 'II. Meşrutiyet', 'Trablusgarp Savaşı', 'Balkan Savaşları', 'Çanakkale Cephesi',
+      'Kafkas Cephesi', 'Sina ve Filistin Cephesi', 'Barbaros Hayrettin Paşa', 'Turgut Reis', 'Piri Reis',
+      'Sokullu Mehmet Paşa', 'Köprülüler Dönemi', 'Karlofça Antlaşması', 'Küçük Kaynarca Antlaşması', 'Sened-i İttifak',
+      'Kanun-i Esasi', '31 Mart Vakası', 'Osmanlı Padişahları', 'Osmanlı Donanması', 'Yeniçeri Ocağı', 'Devşirme sistemi',
+      'Tımar sistemi', 'Divan-ı Hümayun', 'Kapıkulu ocakları', 'Ahilik sistemi', 'Göktürkler', 'Uygurlar', 'Karahanlılar',
+      'Gazneliler', 'Harzemşahlar', 'İldenizliler', 'Saltuklular', 'Artuklular', 'Dânişmendliler', 'Mengüçlüler',
+      
+      // 7. Türk Sineması, Tiyatro ve Müzik Dünyası (Yeşilçam ve Modern)
+      'Şener Şen', 'Kemal Sunal', 'Adile Naşit', 'Münir Özkul', 'Zeki Alasya', 'Metin Akpınar', 'Türkan Şoray',
+      'Hülya Koçyiğit', 'Filiz Akın', 'Fatma Girik', 'Ayhan Işık', 'Cüneyt Arkın', 'Tarık Akan', 'Nuri Bilge Ceylan',
+      'Yılmaz Erdoğan', 'Cem Yılmaz', 'Şahan Gökbakar', 'Atıf Yılmaz', 'Ertem Eğilmez', 'Muhsin Ertuğrul',
+      'Metin Erksan', 'Yılmaz Güney', 'Ekrem Bora', 'Sadri Alışık', 'Hulusi Kentmen', 'Mürüvvet Sim', 'Vahi Öz',
+      'Necdet Tosun', 'Ferdi Tayfur', 'Müslüm Gürses', 'Orhan Gencebay', 'İbrahim Tatlıses', 'Sezen Aksu',
+      'Tarkan', 'Ajda Pekkan', 'Zeki Müren', 'Müzeyyen Senar', 'Safiye Ayla', 'Dario Moreno', 'Barış Manço',
+      'Cem Karaca', 'Erkin Koray', 'Fikret Kızılok', 'Mazhar Alanson', 'Özkan Uğur', 'Fuat Güner', 'Sertab Erener',
+      'Teoman', 'Şebnem Ferah', 'Mor ve Ötesi', 'Duman', 'Athena', 'Kargo', 'Manga', 'Gripin', 'Yüksek Sadakat'
+    ]
   },
   {
     slug: 'matematik',
     topics: [
-      'Matematik', 'Geometri', 'Cebir', 'Trigonometri', 'İstatistik', 'Olasılık',
-      'Sayı teorisi', 'Kalkülüs', 'Pisagor teoremi', 'Asal sayı', 'Fibonacci dizisi',
-      'Pi sayısı', 'Küme teorisi', 'Fonksiyon (matematik)', 'Logaritma',
-    ],
+      // 1. Temel Aritmetik ve Sayı Sistemleri
+      'Matematik', 'Geometri', 'Cebir', 'Trigonometri', 'İstatistik', 'Olasılık', 'Sayı teorisi', 'Kalkülüs',
+      'Pisagor teoremi', 'Asal sayı', 'Fibonacci dizisi', 'Pi sayısı', 'Küme teorisi', 'Fonksiyon (matematik)',
+      'Logaritma', 'Türev', 'İntegral', 'Matris', 'Determinant', 'Vektör', 'Limit', 'Dizi ve seriler', 'Polinom',
+      'Denklem sistemleri', 'Mutlak değer', 'Oran orantı', 'Yüzde problemleri', 'Kâr zarar problemleri',
+      'Hız problemleri', 'İşçi havuz problemleri', 'Yaş problemleri', 'Grafik okuma', 'Analitik geometri',
+      'Çember ve daire', 'Üçgenler', 'Dörtgenler', 'Çokgenler', 'Katı cisimler', 'Trigonometrik özdeşlikler',
+      'Kombinasyon', 'Permütasyon', 'Binom açılımı', 'Modüler aritmetik', 'EBOB EKOK', 'Bölme bölünebilme',
+      'Rasyonel sayılar', 'Üslü ifadeler', 'Köklü ifadeler', 'Çarpanlara ayırma', 'Birinci dereceden denklemler',
+      'İkinci dereceden denklemler', 'Karmaşık sayılar', 'Trigonometrik denklemler', 'Logaritmik denklemler',
+      'Türev uygulamaları', 'İntegral uygulamaları', 'Alan hesaplama', 'Hacim hesaplama', 'Euler özdeşliği',
+      'Fermat son teoremi', 'Goldbach hipotezi', 'Riemann hipotezi', 'Asal sayı teoremi', 'Pascal üçgeni',
+      'Descartes kartezyen koordinat sistemi', 'Öklid geometrisi', 'Non-Euclidean geometri', 'Topoloji', 'Fraktal',
+      'Kandel çemberi', 'Sonsuzluk kavramı', 'Matematiksel mantık', 'Önermeler', 'Niceleyiciler', 'Kümelerde işlemler',
+      'Kartezyen çarpım', 'Bağıntı', 'Fonksiyon türleri', 'Bire bir fonksiyon', 'Örten fonksiyon', 'Ters fonksiyon',
+      'Bileşke fonksiyon', 'Polinom fonksiyonlar', 'Rasyonel fonksiyonlar', 'Üstel fonksiyonlar', 'Trigonometrik fonksiyonlar',
+      'Ters trigonometrik fonksiyonlar', 'Hiperbolik fonksiyonlar', 'Parametrik denklemler', 'Kutup koordinatları',
+      'Vektörel çarpım', 'Skaler çarpım', 'Doğru denklemi', 'Düzlem denklemi', 'Konikler', 'Çember denklemi',
+      'Elips', 'Hiperbol', 'Parabol', 'Teğet', 'Normal', 'Asimptot', 'Türev tanımı', 'Zincir kuralı', 'L Hospital kuralı',
+      'Belirsiz integraller', 'Belirli integraller', 'Riemann toplamı', 'Banach uzayı', 'Hilbert uzayı',
+      'Kategori teorisi', 'Boolean cebiri', 'Oyun teorisi', 'Çizge teorisi', 'Kalkülüs varyasyonları',
+      'Diferansiyel geometri', 'Diferansiyel denklemler', 'Kısmi türevli diferansiyel denklemler',
+      'Adi diferansiyel denklemler', 'Fourier analizi', 'Laplace dönüşümü', 'Z dönüşümü', 'Kompleks analiz',
+      'Reel analiz', 'Ölçü teorisi', 'Ergodik teori', 'Dinamik sistemler', 'Kaos teorisi', 'Bifürkasyon teorisi',
+      'Stokastik süreçler', 'Brown hareketi', 'Monte Carlo simülasyonu', 'Markov zincirleri', 'Kuyruk teorisi',
+      'Varyans analizi', 'Regresyon analizi', 'Hipotez testleri', 'Parametrik olmayan testler',
+      'Harezmi', 'Ömer Hayyam', 'İbn el-Heysem', 'Biruni', 'Cahit Arf', 'Kerim Erim', 'Salih Murat Uzdilek',
+      'Nazım Terzioğlu', 'Cahit Arf Teoremi', 'Arf Değişmezi', 'Matematik tarihi', 'Geometri tarihi'
+    ]
   },
   {
     slug: 'guncel',
     topics: [
-      'Teknoloji', 'Yapay zeka', 'Sosyal medya', 'İnternet', 'Uzay teknolojisi',
-      'Akıllı telefon', 'Elektrikli araç', 'Kripto para', 'Bulut bilişim',
-      'Siber güvenlik', 'Nesnelerin interneti', 'SpaceX', 'NASA', '5G',
-    ],
+      // 1. Yerli Teknoloji ve Dijital Dönüşüm (Türkiye Odaklı)
+      'Togg', 'Bayraktar TB2', 'Bayraktar Akıncı', 'Kızılelma', 'Anka', 'Aksungur', 'Atak Helikopteri', 'Gökbey',
+      'Altay Tankı', 'TCG Anadolu', 'MİLGEM', 'İ sınıfı fırkateyn', 'Hisar füze sistemi', 'Siper füze sistemi',
+      'Bora füzesi', 'Atmaca füzesi', 'Tübitak', 'TUSAŞ', 'ROKETSAN', 'ASELSAN', 'HAVELSAN', 'TEI', 'ASPİLSAN',
+      'Bilişim Vadisi', 'Teknopark İstanbul', 'Gaziantep Teknopark', 'İzmir Teknopark', 'Eskişehir Teknopark',
+      'Yerli otomobil', 'Yerli elektrikli araç', 'Yerli uydu', 'Türksat 3A', 'Türksat 4A', 'Türksat 4B', 'Türksat 5A',
+      'Türksat 5B', 'Türksat 6A', 'İmece uydusu', 'Göktürk-1', 'Göktürk-2', 'Borsa İstanbul', 'TCMB', 'Yapay zeka',
+      'Sosyal medya', 'İnternet', 'Uzay teknolojisi', 'Akıllı telefon', 'Elektrikli araç', 'Kripto para', 'Bulut bilişim',
+      'Siber güvenlik', 'Nesnelerin interneti', '5G', '6G teknolojisi', 'Li-Fi', 'Kuantum internet', 'Katı hal bataryaları',
+      'Giyilebilir teknoloji', 'Akıllı saatler', 'Akıllı gözlükler', 'Biyonik uzuvlar', 'Genetik mühendisliği',
+      'Sentetik biyoloji', 'Dikey tarım', 'Yapay et', 'Karbon yakalama', 'Geleceğin ulaşım sistemleri', 'Yörünge turizmi',
+      'Asteroid madenciliği', 'Ay üssü projeleri', 'Yapay zeka ajanı', 'Multimodal yapay zeka', 'Açık kaynak yapay zeka',
+      'Büyük veri analitiği', 'Yapay zeka modelleri', 'Büyük dil modelleri', 'Makine öğrenmesi', 'Derin öğrenme',
+      'Kuantum bilgisayar', 'Artırılmış gerçeklik', 'Sanal gerçeklik', 'Metaverse', 'Otonom sürüş', 'Lityum iyon pil',
+      'Batarya teknolojileri', 'Yenilenebilir enerji', 'Güneş paneli', 'Rüzgar türbini', 'Hidrojen yakıt hücresi',
+      'Nükleer füzyon', 'Biyoteknoloji', 'Gen terapisi', 'CRISPR', 'Nanoteknoloji', '3D yazıcı', '4D yazıcı',
+      'Akıllı şehirler', 'Blokzincir', 'Akıllı sözleşmeler', 'NFT', 'Merkeziyetsiz finans', 'Siber savaş', 'Veri gizliliği',
+      'Kişisel verilerin korunması', 'Dijital dönüşüm', 'E-ticaret', 'Dijital pazarlama', 'Sosyal medya trendleri',
+      'Influencer pazarlaması', 'Podcast', 'Streaming servisleri', 'Siber güvenlik protokolleri', 'Zero Trust',
+      'Ransomware', 'Phishing', 'Deepfake', 'Algoritma etiği', 'Yapay zeka denetimi', 'Teknolojik tekillik'
+    ]
   },
   {
     slug: 'ehliyet',
     topics: [
-      'Trafik kuralları', 'Sürücü belgesi', 'Kara yolları', 'Trafik işaretleri',
-      'Trafik kazası', 'Emniyet kemeri', 'Hız sınırı', 'Trafik ışığı',
-      'Motorlu taşıt', 'Karayolu Trafik Kanunu',
-    ],
+      // 1. Karayolları Trafik Kuralları ve Mevzuat (Türkiye)
+      'Trafik kuralları', 'Sürücü belgesi', 'Kara yolları', 'Trafik işaretleri', 'Trafik kazası', 'Emniyet kemeri',
+      'Hız sınırı', 'Trafik ışığı', 'Motorlu taşıt', 'Karayolu Trafik Kanunu', 'İlk yardım', 'Motor bilgisi',
+      'Trafik adabı', 'Araç tekniği', 'Direksiyon sınavı', 'İç kanama', 'Şok pozisyonu', 'Turnike uygulaması',
+      'Suni solunum', 'Kalp masajı', 'Koma pozisyonu', 'Heimlich manevrası', 'Kırık çıkık çıkıklar', 'Yanıklar',
+      'Zehirlenmeler', 'Böcek sokmaları', 'Trafik işaret levhaları', 'Tehlike uyarı işaretleri', 'Trafik tanzim işaretleri',
+      'Bilgi işaretleri', 'Durma duraklama park etme', 'Öncelik hakkı', 'Geçiş üstünlüğü', 'Kavşaklar', 'Dönel kavşak',
+      'Şerit izleme', 'Öncü araç', 'Takip mesafesi', 'Hız sınırları', 'Otoyol kuralları', 'Yerleşim yeri',
+      'Gece sürüşü', 'Sisli hava sürüşü', 'Yağmurlu hava sürüşü', 'Karlı buzlu yollar', 'Akuplaj', 'Fren sistemi',
+      'ABS', 'ASR', 'ESP', 'Hava yastığı', 'Direksiyon sistemi', 'Süspansiyon sistemi', 'Lastik diş derinliği',
+      'Rot ayarı', 'Balans ayarı', 'Motor yağı', 'Antifriz', 'Fren hidroliği', 'Motor soğutma suyu',
+      'Akü kutup başları', 'Alternatör', 'Marş motoru', 'Buji', 'Enjektör', 'Debriyaj', 'Vites kutusu',
+      'Diferansiyel', 'Egzoz emisyon', 'Muayene süreleri', 'Zorunlu trafik sigortası', 'Kasko', 'Ehliyet sınıfları',
+      'M sınıfı', 'A1 sınıfı', 'A2 sınıfı', 'A sınıfı', 'B1 sınıfı', 'B sınıfı', 'BE sınıfı', 'C1 sınıfı',
+      'C sınıfı', 'CE sınıfı', 'D1 sınıfı', 'D sınıfı', 'DE sınıfı', 'F sınıfı', 'G sınıfı', 'Ceza puanı',
+      'Ehliyet iptali', 'Alkollü araç kullanımı', 'Uyuşturucu etkisi', 'Kırmızı ışık ihlali', 'Ters yön',
+      'Hatalı sollama', 'Yaya geçidi önceliği', 'Okul geçidi', 'Engelli park yeri', 'Trafik polisi işaretleri',
+      'Yolcu taşıma kuralları', 'Yük taşıma kuralları', 'Azami yüklü ağırlık', 'Dinamik denge', 'Hidroplaning',
+      'Akü şarj etme', 'Lastik değişimi', 'Sigorta atması', 'Katalitik konvertör', 'Triger kayışı', 'Radyatör bakımı',
+      'Enjektör temizliği', 'Turbo şarj', 'Intercooler', 'Şanzıman yağı', 'Direksiyon kutusu', 'Rot başı',
+      'Aks mafsalı', 'Amortisör', 'Yay salınımı', 'Kampana fren', 'Disk fren', 'El freni ayarı', 'Fren balatası',
+      'Vantilatör kayışı', 'Vakum pompası', 'Motor arıza lambası', 'Yağ basınç lambası', 'Şarj lambası', 'Hararet göstergesi'
+    ]
   },
   {
     slug: 'cografya',
     topics: [
-      'Coğrafya', 'Dünya', 'Kıta', 'Okyanus', 'Nehir', 'Dağ', 'Göl', 'Çöl',
-      'Everest Dağı', 'Nil Nehri', 'Amazon Yağmur Ormanları', 'Sahra Çölü',
-      'Akdeniz', 'Karadeniz', 'Marmara Denizi', 'Toros Dağları', 'Anadolu',
-      'İklim', 'Volkan', 'Deprem',
-    ],
+      // 1. Türkiye Coğrafyası (Dağlar, Nehirler, Göller, Bölgeler)
+      'Türkiye coğrafyası', 'Marmara Bölgesi', 'Ege Bölgesi', 'Akdeniz Bölgesi', 'İç Anadolu Bölgesi',
+      'Karadeniz Bölgesi', 'Doğu Anadolu Bölgesi', 'Güneydoğu Anadolu Bölgesi', 'Ağrı Dağı', 'Cilo Dağı',
+      'Süphan Dağı', 'Kaçkar Dağları', 'Uludağ', 'Erciyes Dağı', 'Hasan Dağı', 'Nemrut Dağı', 'Palandöken Dağı',
+      'Kuzey Anadolu Dağları', 'Toros Dağları', 'Kızılırmak', 'Yeşilırmak', 'Sakarya Nehri', 'Aras Nehri',
+      'Kura Nehri', 'Seyhan Nehri', 'Ceyhan Nehri', 'Büyük Menderes', 'Gediz Nehri', 'Fırat Nehri', 'Dicle Nehri',
+      'Van Gölü', 'Tuz Gölü', 'Beyşehir Gölü', 'Eğirdir Gölü', 'Burdur Gölü', 'İznik Gölü', 'Ulubat Gölü',
+      'Sapanca Gölü', 'Çıldır Gölü', 'Acıgöl', 'Akşehir Gölü', 'Eber Gölü', 'Işıklı Gölü', 'Kovada Gölü',
+      'Hazar Gölü', 'Çıldır Gölü', 'Tortum Gölü', 'Abant Gölü', 'Yedigöller', 'Sapanca Gölü', 'Marmara Gölü',
+      'İstanbul Boğazı', 'Çanakkale Boğazı', 'İzmit Körfezi', 'Saros Körfezi', 'Edremit Körfezi', 'Çandarlı Körfezi',
+      'İzmir Körfezi', 'Kuşadası Körfezi', 'Gökova Körfezi', 'Hisarönü Körfezi', 'Fethiye Körfezi', 'Antalya Körfezi',
+      'Mersin Körfezi', 'İskenderun Körfezi', 'Kızılırmak Deltası', 'Yeşilırmak Deltası', 'Çukurova', 'Gediz Deltası',
+      'Küçük Menderes Deltası', 'Büyük Menderes Deltası', 'Silifke Deltası', 'Tekke Yarımadası', 'İnceburun',
+      'Sinop Yarımadası', 'Gelibolu Yarımadası', 'Biga Yarımadası', 'Kocaeli Yarımadası', 'Çatalca Yarımadası',
+      'Türkiye iklimi', 'Akdeniz iklimi', 'Karasal iklim', 'Karadeniz iklimi', 'Marmara geçiş iklimi',
+      'Türkiye\'de deprem kuşakları', 'Kuzey Anadolu Fay Hattı', 'Batı Anadolu Fay Hattı', 'Doğu Anadolu Fay Hattı',
+      'Tektonik depremler', 'Türkiye\'nin milli parkları', 'Yedigöller Milli Parkı', 'Kuşcenneti Milli Parkı',
+      'Uludağ Milli Parkı', 'Spil Dağı Milli Parkı', 'Altınbeşik Mağarası Milli Parkı', 'Köprülü Kanyon Milli Parkı',
+      'Termessos Milli Parkı', 'Beydağları Sahil Milli Parkı', 'Olimpos Beydağları Milli Parkı', 'Göreme Tarihi Milli Parkı'
+    ]
   },
   {
     slug: 'fen',
     topics: [
-      'Fizik', 'Kimya', 'Biyoloji', 'Astronomi', 'Evrim', 'Genetik', 'Hücre',
-      'DNA', 'Atom', 'Enerji', 'Yerçekimi', 'Güneş Sistemi', 'Fotosentez',
-      'Elektrik', 'Manyetizma', 'Termodinamik', 'Periyodik tablo', 'Işık',
-      'Kuantum mekaniği', 'Albert Einstein', 'Isaac Newton', 'Charles Darwin',
-    ],
+      // 1. Fen Bilimleri, Fizik, Kimya, Biyoloji (Yerli Bilim İnsanları ve Müfredat)
+      'Fizik', 'Kimya', 'Biyoloji', 'Astronomi', 'Evrim', 'Genetik', 'Hücre', 'DNA', 'Atom', 'Enerji',
+      'Yerçekimi', 'Güneş Sistemi', 'Fotosentez', 'Elektrik', 'Manyetizma', 'Termodinamik', 'Periyodik tablo', 'Işık',
+      'Kuantum mekaniği', 'Aziz Sancar', 'Oktay Sinanoğlu', 'Feza Gürsey', 'Behram Kurşunoğlu', 'Hulusi Behçet',
+      'Cahit Arf', 'Kerim Erim', 'Salih Murat Uzdilek', 'Nazım Terzioğlu', 'Fatin Gökmen', 'Ali Kuşçu', 'Takiyüddin',
+      'İbn Sina', 'Farabi', 'El-Kindi', 'El-Razi', 'El-Biruni', 'Harezmi', 'Ömer Hayyam', 'İbn el-Heysem', 'Cezeri',
+      'Proton', 'Nötron', 'Elektron', 'Kuantum', 'Foton', 'Gluon', 'Kara delik', 'Nötron yıldızı', 'Beyaz cüce',
+      'Süpernova', 'Büyük Patlama', 'Kozmik mikrodalga arka plan', 'Samanyolu', 'Andromeda', 'Exoplanet',
+      'Güneş rüzgarı', 'Manyetosfer', 'Aurora', 'Kutup ışıkları', 'İzafiyet teorisi', 'Özel görelilik', 'Genel görelilik',
+      'Kinetik enerji', 'Potansiyel enerji', 'Isı', 'Sıcaklık', 'Entropi', 'Termodinamiğin yasaları',
+      'Elektromanyetik dalgalar', 'Radyo dalgaları', 'Mikrodalga', 'Kızılötesi', 'Morötesi', 'X ışınları', 'Gama ışınları',
+      'Optik', 'Yansıma', 'Kırılma', 'Girişim', 'Kırınım', 'Polarizasyon', 'Asit', 'Baz', 'Tuz', 'pH ölçeği',
+      'Kimyasal bağ', 'Kovalent bağ', 'İyonik bağ', 'Metalik bağ', 'Hidrojen bağı', 'Mol kavramı', 'Avogadro sayısı',
+      'Çözelti', 'Çözünürlük', 'Redoks', 'Elektroliz', 'Organik kimya', 'Anorganik kimya', 'Polimer', 'Hücre zarı',
+      'Sitoplazma', 'Çekirdek', 'Mitokondri', 'Ribozom', 'Endoplazmik retikulum', 'Golgi aygıtı', 'Lizozom',
+      'Kloroplast', 'Koful', 'Hücre duvarı', 'Mayoz bölünme', 'Mitoz bölünme', 'Krossing-over', 'Mutasyon',
+      'Modifikasyon', 'Adaptasyon', 'Doğal seçilim', 'Biyolojik çeşitlilik', 'Ekosistem', 'Besin zinciri', 'Besin ağı',
+      'Üretici', 'Tüketici', 'Ayrıştırıcı', 'Karbon döngüsü', 'Azot döngüsü', 'Su döngüsü', 'Sera etkisi',
+      'Küresel ısınma', 'Ozon tabakası', 'Biyom', 'Tundra', 'Tayga', 'Çöl biyomu', 'Orman biyomu', 'Savan biyomu',
+      'Sucul ekosistem', 'Nükleer reaktör', 'Fisyon', 'Radyoaktif bozunma', 'Alfa ışıması', 'Beta ışıması', 'Yarı ömür'
+    ]
   },
   {
     slug: 'tarih',
     topics: [
-      'Tarih', 'Antik Roma', 'Antik Yunan', 'İkinci Dünya Savaşı', 'Birinci Dünya Savaşı',
-      'Soğuk Savaş', 'Rönesans', 'Sanayi Devrimi', 'Fransız Devrimi', 'Mısır Piramitleri',
-      'Bizans İmparatorluğu', 'İpek Yolu', 'Selçuklu Devleti', 'Cengiz Han',
-      'Kurtuluş Savaşı', 'Cumhuriyetin ilanı',
-    ],
+      // 1. Türk ve Dünya Tarihi (Türk Odaklı Kapsamlı Havuz)
+      'Tarih', 'İkinci Dünya Savaşı', 'Birinci Dünya Savaşı', 'Soğuk Savaş', 'Rönesans', 'Sanayi Devrimi',
+      'Fransız Devrimi', 'Bizans İmparatorluğu', 'İpek Yolu', 'Selçuklu Devleti', 'Cengiz Han', 'Kurtuluş Savaşı',
+      'Cumhuriyetin ilanı', 'Mezopotamya', 'Sümerler', 'Akadlar', 'Babil', 'Asurlular', 'Elam', 'Urartular',
+      'Hititler', 'Frigler', 'Lidyalılar', 'İyonlar', 'İskitler', 'Pers İmparatorluğu', 'Büyük İskender',
+      'Hellenistik Dönem', 'Roma Cumhuriyeti', 'Roma İmparatorluğu', 'Julius Caesar', 'Augustus', 'Pax Romana',
+      'Doğu Roma İmparatorluğu', 'Batı Roma İmparatorluğu', 'Kavimler Göçü', 'Orta Çağ', 'Feodalite',
+      'Haçlı Seferleri', 'Magna Carta', 'Yüz Yıl Savaşları', 'İstanbulun Fethi', 'Coğrafi Keşifler', 'Reform',
+      'Aydınlanma Çağı', 'Yedi Yıl Savaşları', 'Amerikan Bağımsızlık Bildirgesi', 'Fransız İhtilali', 'Viyana Kongresi',
+      '1848 İhtilalleri', 'Amerikan İç Savaşı', 'Birinci Dünya Savaşı Cepheleri', 'Çanakkale Cephesi',
+      'Kafkas Cephesi', 'Sina ve Filistin Cephesi', 'Milletler Cemiyeti', 'İspanyol İç Savaşı', 'Mussolini',
+      'Adolf Hitler', 'Joseph Stalin', 'Winston Churchill', 'Franklin D. Roosevelt', 'Normandiya Çıkarması',
+      'Stalingrad Muharebesi', 'Berlin Duvarı', 'Küba Füze Krizi', 'Vietnam Savaşı', 'Kore Savaşı', 'Uzay Yarışı',
+      'Berlinin Düşüşü', 'Yalta Konferansı', 'Potsdam Konferansı', 'Birleşmiş Milletler', 'NATO', 'Varşova Paktı',
+      'Avrupa Birliği', 'Asya Tarihi', 'Çin Hanedanlıkları', 'Qin Hanedanı', 'Han Hanedanı', 'Tang Hanedanı',
+      'Song Hanedanı', 'Ming Hanedanı', 'Qing Hanedanı', 'Büyük Çin Seddi', 'Japonya Tarihi', 'Samuray', 'Şogunluk',
+      'Meiji Restorasyonu', 'Hindistan Tarihi', 'Mogul İmparatorluğu', 'Tac Mahal', 'Aztekler', 'Mayalar', 'İnkalar',
+      'Pre-Kolomb Amerika', 'Afrika Tarihi', 'Kartaca', 'Mali İmparatorluğu', 'Songhay İmparatorluğu', 'Zulular',
+      'Osmanlı Kuruluş Dönemi', 'Osmanlı Yükselme Dönemi', 'Osmanlı Duraklama Dönemi', 'Osmanlı Gerileme Dönemi',
+      'Osmanlı Dağılma Dönemi', 'Tanzimat Fermanı', 'Islahat Fermanı', 'I. Meşrutiyet', 'II. Meşrutiyet',
+      'Trablusgarp Savaşı', 'Balkan Savaşları', 'Barbaros Hayrettin Paşa', 'Turgut Reis', 'Piri Reis',
+      'Sokullu Mehmet Paşa', 'Köprülüler Dönemi', 'Karlofça Antlaşması', 'Küçük Kaynarca Antlaşması', 'Sened-i İttifak',
+      'Kanun-i Esasi', '31 Mart Vakası', 'Osmanlı Padişahları', 'Osmanlı Donanması', 'Yeniçeri Ocağı', 'Devşirme sistemi',
+      'Tımar sistemi', 'Divan-ı Hümayun', 'Kapıkulu ocakları', 'Ahilik sistemi'
+    ]
   },
   {
     slug: 'lgs',
     topics: [
-      'Matematik', 'Fen bilimleri', 'Türkçe', 'İnkılap tarihi ve Atatürkçülük',
-      'İngilizce', 'Din kültürü ve ahlak bilgisi', 'Hücre bölünmesi', 'Kuvvet ve hareket',
-      'Basınç', 'Madde ve endüstri', 'Basit makineler',
-    ],
+      // 1. LGS Müfredatı (MEB Odaklı Tüm Konular ve Alt Başlıklar)
+      'Matematik', 'Fen bilimleri', 'Türkçe', 'İnkılap tarihi ve Atatürkçülük', 'İngilizce',
+      'Din kültürü ve ahlak bilgisi', 'Hücre bölünmesi', 'Kuvvet ve hareket', 'Basınç', 'Madde ve endüstri',
+      'Basit makineler', 'Çarpanlar ve katlar', 'Üslü ifadeler', 'Kareköklü ifadeler', 'Veri analizi',
+      'Basit olayların olma olasılığı', 'Cebirsel ifadeler ve özdeşlikler', 'Doğrusal denklemler', 'Eşitsizlikler',
+      'Üçgenler', 'Eşlik ve benzerlik', 'Dönüşüm geometrisi', 'Geometrik cisimler', 'Mevsimlerin oluşumu',
+      'İklim ve hava hareketleri', 'DNA ve genetik kod', 'Kalıtım', 'Mutasyon ve modifikasyon', 'Adaptasyon',
+      'Biyoteknoloji', 'Katı basıncı', 'Sıvı basıncı', 'Gaz basıncı', 'Periyodik sistem',
+      'Fiziksel ve kimyasal değişimler', 'Kimyasal tepkimeler', 'Asitler ve bazlar', 'Maddenin ısı ile etkileşimi',
+      'Türkiye\'de kimya endüstrisi', 'İş güç enerji', 'Makaralar', 'Kaldıraçlar', 'Eğik düzlem', 'Dişli çarklar',
+      'Kıstrak ve çıkrık', 'Madde döngüleri', 'Sürdürülebilir kalkınma', 'Çevre sorunları',
+      'Biyoteknoloji uygulamaları', 'Elektrik yükleri ve elektriklenme', 'Elektrik yükleri ve elektrik akımı',
+      'Manyetizma', 'Işığın yayılması', 'Yansıma kanunları', 'Aynalar', 'Işığın kırılması', 'Mercekler',
+      'Ses dalgaları', 'Sesin yayılması', 'Sesin sürati', 'Sesin özellikleri', 'Sözcükte anlam', 'Cümlede anlam',
+      'Paragraf yorumu', 'Fiilimsiler', 'Cümlenin ögeleri', 'Fiilde çatılar', 'Cümle türleri', 'Anlatım bozuklukları',
+      'Yazım kuralları', 'Noktalama işaretleri', 'Metin türleri', 'Sözel mantık ve muhakeme', 'Bir Kahraman Doğuyor',
+      'Milli Uyanış: Bağımsızlık Yolunda Atılan Adımlar', 'Ya İstiklal Ya Ölüm', 'Atatürkçülük ve Çağdaşlaşan Türkiye',
+      'Demokratikleşme Çabaları', 'Atatürk Dönemi Türk Dış Politikası', 'Atatürk\'ün Ölümü ve Sonrası',
+      'Kader inancı', 'Zekat ve sadaka ibadeti', 'Din ve hayat', 'Hz. Muhammed\'in örnekliği',
+      'Kuran-ı Kerim ve özellikleri', 'Peygamberler ve ilahi kitaplar', 'İslam ve temizlik', 'Zararlı alışkanlıklar'
+    ]
   },
   {
     slug: 'genel-kultur-sorulari',
     topics: [
-      'Mitoloji', 'Felsefe', 'Psikoloji', 'Sosyoloji', 'Ekonomi', 'Hukuk',
-      'Yunan mitolojisi', 'Sokrates', 'Platon', 'Aristoteles', 'Sigmund Freud',
-      'Uluslararası ilişkiler', 'Diplomasi', 'İnsan hakları', 'Demokrasi',
-    ],
-  },
+      // 1. Felsefe, Sosyoloji, Psikoloji, Hukuk, Ekonomi (Türkçe Akademik ve Düşünce Hayatı)
+      'Felsefe', 'Psikoloji', 'Sosyoloji', 'Ekonomi', 'Hukuk', 'Uluslararası ilişkiler', 'Diplomasi',
+      'İnsan hakları', 'Demokrasi', 'Türk felsefe tarihi', 'İslam felsefesi', 'Farabi', 'İbn Sina', 'İbn Rüşd',
+      'Gazali', 'Sühreverdi', 'İbn Tufeyl', 'Molla Fenari', 'Kâtib Çelebi', 'Erzurumlu İbrahim Hakkı',
+      'İsmail Hakkı Bursevi', 'Ahmet Cevdet Paşa', 'Ziya Gökalp', 'Mehmet Akif Ersoy', 'Nurettin Topçu',
+      'Hilmi Ziya Ülken', 'İsmail Hakkı Baltacıoğlu', 'Mehmet Kaplan', 'Takiyettin Mengüşoğlu', 'Nusret Hızır',
+      'Macit Gökberk', 'Teoman Duralı', 'İoanna Kuçuradi', 'Mikroekonomi', 'Makroekonomi', 'Enflasyon', 'Deflasyon',
+      'Stagflasyon', 'Gayri Safi Yurtiçi Hasıla', 'Merkez bankası', 'Para politikası', 'Maliye politikası',
+      'Arz ve talep', 'Piyasa dengesi', 'Monopol', 'Oligopol', 'Serbest piyasa', 'Kapitalizm', 'Sosyalizm',
+      'Komünizm', 'Liberalizm', 'Keynesyen iktisat', 'Monetarizm', 'Anayasa hukuku', 'İdare hukuku', 'Medeni hukuk',
+      'Ceza hukuku', 'Ticaret hukuku', 'İş hukuku', 'Uluslararası kamu hukuku', 'Uluslararası özel hukuk',
+      'Yargıtay', 'Danıştay', 'Anayasa Mahkemesi', 'Sayıştay', 'Hakim', 'Savcı', 'Avukat', 'Noter', 'Baro',
+      'Kuvvetler ayrılığı', 'Yasama', 'Yürütme', 'Yargı', 'Seçim sistemi', 'Siyasi partiler', 'Parlamenter sistem',
+      'Başkanlık sistemi', 'Yarı başkanlık sistemi', 'Birleşmiş Milletler Güvenlik Konseyi', 'Uluslararası Adalet Divanı',
+      'Uluslararası Ceza Mahkemesi', 'Avrupa İnsan Hakları Mahkemesi', 'Cenevre Sözleşmesi', 'Viyana Sözleşmesi',
+      'İnsan Hakları Evrensel Beyannamesi', 'Sosyolojik teoriler', 'Psikolojik akımlar', 'Bilişsel psikoloji'
+    ]
+  }
 ]
 
 const DIFFICULTIES = ['kolay', 'orta', 'zor', 'cok_zor', 'profesyonel']
