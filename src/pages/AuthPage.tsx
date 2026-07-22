@@ -5,16 +5,17 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Eye, EyeOff, Mail, Lock, User, Upload, AlertCircle, CheckCircle2 } from 'lucide-react'
 
-type Mode = 'login' | 'register' | 'forgot'
+type Mode = 'login' | 'register' | 'forgot' | 'reset'
 
 export default function AuthPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signIn, signUp, resetPassword, user, profile } = useAuth()
+  const { signIn, signUp, resetPassword, updatePassword, user, profile, passwordRecovery } = useAuth()
 
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [username, setUsername] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,15 +31,20 @@ export default function AuthPage() {
     }
   }, [searchParams])
 
+  // Şifre sıfırlama linkinden gelindiğinde otomatik olarak "yeni şifre belirle" ekranını göster
   useEffect(() => {
-    if (user && profile) {
-      if (profile.is_admin) {
-        navigate('/admin')
-      } else {
-        navigate('/')
-      }
+    if (passwordRecovery) {
+      setMode('reset')
+      setError(null)
+      setSuccess(null)
     }
-  }, [user, profile, navigate])
+  }, [passwordRecovery])
+
+  useEffect(() => {
+    if (user && profile && mode !== 'reset') {
+      navigate('/')
+    }
+  }, [user, profile, navigate, mode])
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -104,6 +110,19 @@ export default function AuthPage() {
         } else {
           setSuccess('Şifre sıfırlama bağlantısı e-postanıza gönderildi.')
         }
+      } else if (mode === 'reset') {
+        if (newPassword.length < 6) {
+          setError('Şifre en az 6 karakter olmalıdır.')
+          setLoading(false)
+          return
+        }
+        const { error } = await updatePassword(newPassword)
+        if (error) {
+          setError(error)
+        } else {
+          setSuccess('Şifreniz güncellendi! Yönlendiriliyorsunuz...')
+          setTimeout(() => navigate('/'), 1200)
+        }
       }
     } catch (err) {
       setError('Beklenmeyen bir hata oluştu.')
@@ -129,6 +148,7 @@ export default function AuthPage() {
               {mode === 'login' && 'Hesabınıza giriş yapın'}
               {mode === 'register' && 'Yeni hesap oluşturun'}
               {mode === 'forgot' && 'Şifrenizi sıfırlayın'}
+              {mode === 'reset' && 'Yeni şifrenizi belirleyin'}
             </p>
           </div>
 
@@ -175,22 +195,24 @@ export default function AuthPage() {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm text-primary-300 mb-1.5">E-posta</label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field pl-10"
-                  placeholder="ornek@email.com"
-                  required
-                />
+            {mode !== 'reset' && (
+              <div>
+                <label className="block text-sm text-primary-300 mb-1.5">E-posta</label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field pl-10"
+                    placeholder="ornek@email.com"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            {mode !== 'forgot' && (
+            {mode !== 'forgot' && mode !== 'reset' && (
               <div>
                 <label className="block text-sm text-primary-300 mb-1.5">Şifre</label>
                 <div className="relative">
@@ -201,6 +223,30 @@ export default function AuthPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="input-field pl-10 pr-10"
                     placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-200"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {mode === 'reset' && (
+              <div>
+                <label className="block text-sm text-primary-300 mb-1.5">Yeni Şifre</label>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-field pl-10 pr-10"
+                    placeholder="En az 6 karakter"
                     required
                   />
                   <button
@@ -257,6 +303,7 @@ export default function AuthPage() {
                   {mode === 'login' && 'Giriş Yap'}
                   {mode === 'register' && 'Kayıt Ol'}
                   {mode === 'forgot' && 'Sıfırla'}
+                  {mode === 'reset' && 'Şifreyi Güncelle'}
                 </>
               )}
             </button>
