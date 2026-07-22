@@ -125,7 +125,8 @@ export default function AuthPage() {
         }
       }
     } catch (err) {
-      setError('Beklenmeyen bir hata oluştu.')
+      console.error('Auth form unexpected error:', err)
+      setError('Beklenmeyen bir hata oluştu. (Ayrıntı için tarayıcı konsoluna bakın)')
     } finally {
       setLoading(false)
     }
