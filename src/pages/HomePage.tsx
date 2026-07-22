@@ -187,7 +187,7 @@ export default function HomePage() {
         <h1 className="text-4xl sm:text-5xl font-bold text-cream-100 mb-2 text-balance">
           Bilgi Yarışması
         </h1>
-        <p className="text-primary-300">Bilgi yarışması - Sonsuz soru, puan sistemi</p>
+        <p className="text-primary-300">Sonsuz soru - Puan sistemi √</p>
       </motion.div>
 
       {/* Home Ad */}
@@ -288,7 +288,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <div className="text-center text-primary-500 text-xs mt-12">
-        <p>Game Developer: Hamdi Uludağ</p>
+        <p>Game Developer: Hamdi Uludağ ™</p>
       </div>
     </div>
   )
