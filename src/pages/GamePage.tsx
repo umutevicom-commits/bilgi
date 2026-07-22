@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameEngine } from '../hooks/useGameEngine'
@@ -9,6 +9,11 @@ import {
   ChevronRight, AlertCircle, Clock,
 } from 'lucide-react'
 
+// Doğru cevaptan sonra kaç saniye içinde bir sonraki soruya otomatik geçilecek
+const AUTO_ADVANCE_SECONDS_CORRECT = 3
+// Yanlış/süre dolduğunda doğru cevabı okuyabilmesi için biraz daha uzun süre
+const AUTO_ADVANCE_SECONDS_WRONG = 5
+
 export default function GamePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -17,6 +22,8 @@ export default function GamePage() {
 
   const engine = useGameEngine(category)
   const [showEndModal, setShowEndModal] = useState(false)
+  const [autoAdvanceIn, setAutoAdvanceIn] = useState<number | null>(null)
+  const advancingRef = useRef(false)
 
   const {
     session, question, timeLeft, selectedAnswer, showResult, isCorrect,
@@ -43,6 +50,46 @@ export default function GamePage() {
       setShowEndModal(true)
     }
   }
+
+  // Elle tıklama ya da otomatik geri sayım - hangisi önce gerçekleşirse bir
+  // sonraki soruya/oyun sonu ekranına o geçsin; ikisinin aynı anda
+  // tetiklenip iki kere ilerlemesini engelle.
+  const triggerAdvance = () => {
+    if (advancingRef.current) return
+    advancingRef.current = true
+    setAutoAdvanceIn(null)
+    handleNextOrEnd()
+  }
+
+  // Sonuç ekranı gösterildiğinde otomatik geri sayımı başlat.
+  // Kullanıcı elle butona basmasa bile bir sonraki soruya otomatik geçilir.
+  useEffect(() => {
+    if (!showResult || showEndModal) {
+      setAutoAdvanceIn(null)
+      return
+    }
+
+    advancingRef.current = false
+    const total = isCorrect ? AUTO_ADVANCE_SECONDS_CORRECT : AUTO_ADVANCE_SECONDS_WRONG
+    setAutoAdvanceIn(total)
+
+    const interval = setInterval(() => {
+      setAutoAdvanceIn((prev) => {
+        if (prev === null) return null
+        if (prev <= 1) {
+          if (!advancingRef.current) {
+            advancingRef.current = true
+            handleNextOrEnd()
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showResult, isCorrect, showEndModal, question?.id])
 
   if (loading) {
     return (
@@ -264,12 +311,17 @@ export default function GamePage() {
                   <p className="text-primary-400 text-xs mt-2 italic">{question.explanation}</p>
                 )}
                 <button
-                  onClick={handleNextOrEnd}
+                  onClick={triggerAdvance}
                   className="btn-accent mt-4 flex items-center gap-2 mx-auto"
                 >
-                  Sonraki Soru
+                  Sonraki Soru {autoAdvanceIn !== null && `(${autoAdvanceIn})`}
                   <ChevronRight size={20} />
                 </button>
+                {autoAdvanceIn !== null && (
+                  <p className="text-primary-500 text-xs mt-2">
+                    {autoAdvanceIn} saniye içinde otomatik geçilecek
+                  </p>
+                )}
               </>
             ) : (
               <>
@@ -283,12 +335,17 @@ export default function GamePage() {
                   <p className="text-primary-400 text-xs mt-2 italic">{question.explanation}</p>
                 )}
                 <button
-                  onClick={handleNextOrEnd}
+                  onClick={triggerAdvance}
                   className="btn-danger mt-4 flex items-center gap-2 mx-auto"
                 >
                   <Trophy size={18} />
-                  Oyunu Bitir
+                  Oyunu Bitir {autoAdvanceIn !== null && `(${autoAdvanceIn})`}
                 </button>
+                {autoAdvanceIn !== null && (
+                  <p className="text-primary-500 text-xs mt-2">
+                    {autoAdvanceIn} saniye içinde otomatik sonlanacak
+                  </p>
+                )}
               </>
             )}
           </motion.div>

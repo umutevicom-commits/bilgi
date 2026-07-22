@@ -34,68 +34,102 @@ export default function LeaderboardPage() {
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true)
     try {
-      let query
       if (period === 'all') {
-        query = supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('is_banned', false)
           .order('total_points', { ascending: false })
           .limit(50)
-      } else {
-        const now = new Date()
-        let startDate: Date
-        if (period === 'today') {
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        } else if (period === 'week') {
-          startDate = new Date(now)
-          startDate.setDate(now.getDate() - 7)
-        } else {
-          startDate = new Date(now)
-          startDate.setMonth(now.getMonth() - 1)
-        }
-        const startISO = startDate.toISOString()
 
-        query = supabase
-          .from('scores')
-          .select(`
-            score,
-            user_id,
-            profiles!inner(*)
-          `)
-          .gte('created_at', startISO)
-          .order('score', { ascending: false })
-          .limit(50)
-      }
+        if (error) throw error
 
-      const { data, error } = await query
-
-      if (error) throw error
-
-      if (period === 'all' && data) {
-        const ranked = (data as Profile[]).map((p, i) => ({
+        const ranked = ((data as Profile[]) || []).map((p, i) => ({
           ...p,
           rank: i + 1,
           recent_score: p.total_points,
         }))
         setEntries(ranked)
-      } else if (data) {
-        const seen = new Set<string>()
-        const ranked: LeaderboardEntry[] = []
-        for (const row of data as any[]) {
-          const profile = row.profiles as Profile
-          if (!profile || seen.has(profile.id)) continue
-          seen.add(profile.id)
-          ranked.push({
-            ...profile,
-            rank: ranked.length + 1,
-            recent_score: row.score,
-          })
-        }
-        setEntries(ranked)
+        return
       }
+
+      // NOT: `scores.user_id` doğrudan `profiles.id`'ye değil `auth.users.id`'ye
+      // referans veriyor. Bu yüzden PostgREST, scores <-> profiles arasında
+      // otomatik bir ilişki kurup `profiles!inner(*)` şeklinde gömülü (embedded)
+      // sorgu yapamıyor ve "could not find a relationship" hatası fırlatıyor.
+      // Bunu Supabase şemasını değiştirmeden çözmek için sorguyu ikiye bölüp
+      // sonuçları burada (client tarafında) birleştiriyoruz.
+      const now = new Date()
+      let startDate: Date
+      if (period === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      } else if (period === 'week') {
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - 7)
+      } else {
+        startDate = new Date(now)
+        startDate.setMonth(now.getMonth() - 1)
+      }
+      const startISO = startDate.toISOString()
+
+      const { data: scoreRows, error: scoreError } = await supabase
+        .from('scores')
+        .select('user_id, score, created_at')
+        .gte('created_at', startISO)
+        .order('score', { ascending: false })
+        .limit(500)
+
+      if (scoreError) throw scoreError
+
+      if (!scoreRows || scoreRows.length === 0) {
+        setEntries([])
+        return
+      }
+
+      // Her kullanıcı için bu periyottaki en yüksek skoru al (aynı kullanıcı
+      // listede birden fazla kez görünmesin, en iyisini göstersin).
+      const bestScoreByUser = new Map<string, number>()
+      for (const row of scoreRows as { user_id: string; score: number }[]) {
+        const current = bestScoreByUser.get(row.user_id)
+        if (current === undefined || row.score > current) {
+          bestScoreByUser.set(row.user_id, row.score)
+        }
+      }
+
+      const userIds = Array.from(bestScoreByUser.keys())
+
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds)
+        .eq('is_banned', false)
+
+      if (profileError) throw profileError
+
+      const profileById = new Map<string, Profile>()
+      for (const p of (profileRows as Profile[]) || []) {
+        profileById.set(p.id, p)
+      }
+
+      const merged: LeaderboardEntry[] = userIds
+        .map((id) => {
+          const profile = profileById.get(id)
+          if (!profile) return null
+          return {
+            ...profile,
+            rank: 0,
+            recent_score: bestScoreByUser.get(id) ?? 0,
+          }
+        })
+        .filter((e): e is LeaderboardEntry => e !== null)
+        .sort((a, b) => b.recent_score - a.recent_score)
+        .slice(0, 50)
+        .map((entry, i) => ({ ...entry, rank: i + 1 }))
+
+      setEntries(merged)
     } catch (err) {
       console.error('Leaderboard error:', err)
+      setEntries([])
     } finally {
       setLoading(false)
     }
