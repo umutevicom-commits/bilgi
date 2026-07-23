@@ -19,13 +19,21 @@ jobs:
           node-version: 'lts/*'
 
       - name: Wikipedia Sorularını Çek ve JSON'a Kaydet
+        env:
+          # Bu run'da hedeflenen toplam yeni soru sayısı. Çok yükseltirsen
+          # Wikipedia'ya isteği artırırsın; gerekirse FETCH_CONCURRENCY'yi
+          # düşük tutarak nazik davranmaya devam et.
+          TARGET_NEW_QUESTIONS: '2000'
+          FETCH_CONCURRENCY: '8'
+          MAX_TOPICS_PER_CATEGORY: '260'
+          RANDOM_ARTICLE_COUNT: '260'
         run: node scripts/fetch-wikipedia-questions.mjs
 
       - name: Değişiklikleri Commit ve Push Et
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/data/questions.json
+          git add public/data/questions.json public/data/used-titles.json
           if git diff --cached --quiet; then
             echo "Yeni soru yok, commit atlanıyor."
           else
