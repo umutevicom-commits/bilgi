@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import type { Profile, Question, Ad, Category, SiteSetting } from '../types'
 import {
   LayoutDashboard, Users, Ban, Clock, Image, Settings, FolderTree,
-  HelpCircle, Award, BarChart3, LogOut, Plus, Trash2, Edit, Power,
+  HelpCircle, Award, BarChart3, LogOut, Plus, Trash2, Edit, Power, X,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -22,6 +22,13 @@ const TABS: { key: AdminTab; label: string; icon: LucideIcon }[] = [
   { key: 'stats', label: 'İstatistik', icon: BarChart3 },
 ]
 
+const AD_PLACEMENT_LABELS: Record<Ad['placement'], string> = {
+  home: 'Ana Sayfa',
+  game_top: 'Oyun - Üst',
+  game_bottom: 'Oyun - Alt',
+  sidebar: 'Kenar Çubuğu',
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
@@ -29,6 +36,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [ads, setAds] = useState<Ad[]>([])
+  const [adForm, setAdForm] = useState<Partial<Ad> | null>(null)
+  const [adSaving, setAdSaving] = useState(false)
+  const [adError, setAdError] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [settings, setSettings] = useState<SiteSetting[]>([])
   const [stats, setStats] = useState({ totalUsers: 0, totalQuestions: 0, totalGames: 0, totalPoints: 0 })
@@ -78,13 +88,73 @@ export default function AdminPage() {
     fetchAll()
   }
 
+  const openNewAdForm = () => {
+    setAdError(null)
+    setAdForm({ placement: 'home', is_active: true })
+  }
+
+  const openEditAdForm = (ad: Ad) => {
+    setAdError(null)
+    setAdForm({ ...ad })
+  }
+
+  const closeAdForm = () => {
+    setAdForm(null)
+    setAdError(null)
+  }
+
+  const saveAd = async () => {
+    if (!adForm) return
+    if (!adForm.placement) {
+      setAdError('Yerleşim (placement) seçimi zorunludur.')
+      return
+    }
+
+    setAdSaving(true)
+    setAdError(null)
+
+    const payload = {
+      placement: adForm.placement,
+      title: adForm.title?.trim() || null,
+      content_html: adForm.content_html?.trim() || null,
+      image_url: adForm.image_url?.trim() || null,
+      target_url: adForm.target_url?.trim() || null,
+      is_active: adForm.is_active ?? true,
+      start_date: adForm.start_date || null,
+      end_date: adForm.end_date || null,
+    }
+
+    const { error } = adForm.id
+      ? await supabase.from('ads').update(payload).eq('id', adForm.id)
+      : await supabase.from('ads').insert(payload)
+
+    setAdSaving(false)
+
+    if (error) {
+      setAdError(error.message)
+      return
+    }
+
+    closeAdForm()
+    fetchAll()
+  }
+
   const deleteAd = async (id: string) => {
-    await supabase.from('ads').delete().eq('id', id)
+    if (!window.confirm('Bu reklamı silmek istediğinizden emin misiniz?')) return
+    const { error } = await supabase.from('ads').delete().eq('id', id)
+    if (error) {
+      setAdError(error.message)
+      return
+    }
     fetchAll()
   }
 
   const toggleAdActive = async (ad: Ad) => {
-    await supabase.from('ads').update({ is_active: !ad.is_active }).eq('id', ad.id)
+    const { error } = await supabase.from('ads').update({ is_active: !ad.is_active }).eq('id', ad.id)
+    if (error) {
+      setAdError(error.message)
+      return
+    }
     fetchAll()
   }
 
@@ -223,14 +293,216 @@ export default function AdminPage() {
 
       {/* Ads */}
       {tab === 'ads' && (
-        <AdsTab
-          ads={ads}
-          onToggleActive={toggleAdActive}
-          onDelete={deleteAd}
-          onRefresh={fetchAll}
-          currentUserId={profile?.id ?? ''}
-        />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-cream-100 font-semibold">Reklamlar</h2>
+            <button onClick={openNewAdForm} className="btn-accent text-sm flex items-center gap-1.5">
+              <Plus size={16} />
+              Yeni Reklam Ekle
+            </button>
+          </div>
+
+          {adError && !adForm && (
+            <div className="p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm break-anywhere">
+              {adError}
+            </div>
+          )}
+
+          {ads.length === 0 && (
+            <div className="glass-card p-6 text-center text-primary-400 text-sm">
+              Henüz reklam eklenmemiş. Başlamak için "Yeni Reklam Ekle" butonuna tıklayın.
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {ads.map((ad) => (
+              <div key={ad.id} className="glass-card p-3 flex items-center gap-3">
+                {ad.image_url ? (
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title || 'Reklam görseli'}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-primary-900"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-primary-900 flex items-center justify-center flex-shrink-0">
+                    <Image size={20} className="text-primary-500" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-cream-100 text-sm font-medium truncate">{ad.title || '(Başlıksız reklam)'}</div>
+                  <div className="text-xs text-primary-400 flex items-center gap-2 flex-wrap">
+                    <span>{AD_PLACEMENT_LABELS[ad.placement]}</span>
+                    <span className={ad.is_active ? 'text-success-400' : 'text-primary-500'}>
+                      {ad.is_active ? '● Aktif' : '○ Pasif'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => openEditAdForm(ad)}
+                    className="p-2 rounded-lg text-primary-300 bg-primary-700/30"
+                    title="Düzenle"
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button
+                    onClick={() => toggleAdActive(ad)}
+                    className={`p-2 rounded-lg ${ad.is_active ? 'text-success-400 bg-success-500/10' : 'text-primary-400 bg-primary-700/30'}`}
+                    title={ad.is_active ? 'Pasif yap' : 'Aktif yap'}
+                  >
+                    <Power size={16} />
+                  </button>
+                  <button
+                    onClick={() => deleteAd(ad.id)}
+                    className="p-2 rounded-lg text-error-400 bg-error-500/10"
+                    title="Sil"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* Ad Create/Edit Modal */}
+      <AnimatePresence>
+        {adForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+            onClick={closeAdForm}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="glass-card p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto no-scrollbar"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-cream-100">
+                  {adForm.id ? 'Reklamı Düzenle' : 'Yeni Reklam Ekle'}
+                </h3>
+                <button onClick={closeAdForm} className="p-1.5 rounded-lg text-primary-400 hover:text-cream-100">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-primary-300 mb-1 block">Yerleşim *</label>
+                  <select
+                    value={adForm.placement || 'home'}
+                    onChange={(e) => setAdForm({ ...adForm, placement: e.target.value as Ad['placement'] })}
+                    className="input-field w-full"
+                  >
+                    {(Object.keys(AD_PLACEMENT_LABELS) as Ad['placement'][]).map((key) => (
+                      <option key={key} value={key}>{AD_PLACEMENT_LABELS[key]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-primary-300 mb-1 block">Başlık</label>
+                  <input
+                    type="text"
+                    value={adForm.title || ''}
+                    onChange={(e) => setAdForm({ ...adForm, title: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Reklam başlığı (opsiyonel)"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-primary-300 mb-1 block">Görsel URL</label>
+                  <input
+                    type="text"
+                    value={adForm.image_url || ''}
+                    onChange={(e) => setAdForm({ ...adForm, image_url: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-primary-300 mb-1 block">Hedef URL (tıklanınca gidilecek link)</label>
+                  <input
+                    type="text"
+                    value={adForm.target_url || ''}
+                    onChange={(e) => setAdForm({ ...adForm, target_url: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-primary-300 mb-1 block">Özel HTML İçerik (opsiyonel)</label>
+                  <textarea
+                    value={adForm.content_html || ''}
+                    onChange={(e) => setAdForm({ ...adForm, content_html: e.target.value })}
+                    className="input-field w-full min-h-[80px] resize-y"
+                    placeholder="Görsel yerine özel bir reklam kodu/HTML kullanmak isterseniz buraya yapıştırın"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-primary-300 mb-1 block">Başlangıç Tarihi</label>
+                    <input
+                      type="date"
+                      value={adForm.start_date ? adForm.start_date.slice(0, 10) : ''}
+                      onChange={(e) => setAdForm({ ...adForm, start_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                      className="input-field w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-primary-300 mb-1 block">Bitiş Tarihi</label>
+                    <input
+                      type="date"
+                      value={adForm.end_date ? adForm.end_date.slice(0, 10) : ''}
+                      onChange={(e) => setAdForm({ ...adForm, end_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                      className="input-field w-full"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-primary-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={adForm.is_active ?? true}
+                    onChange={(e) => setAdForm({ ...adForm, is_active: e.target.checked })}
+                    className="w-4 h-4 rounded accent-accent-400"
+                  />
+                  Reklam aktif olsun
+                </label>
+
+                {adError && (
+                  <div className="p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm break-anywhere">
+                    {adError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button onClick={closeAdForm} className="btn-ghost flex-1" disabled={adSaving}>
+                    Vazgeç
+                  </button>
+                  <button onClick={saveAd} className="btn-accent flex-1" disabled={adSaving}>
+                    {adSaving ? 'Kaydediliyor...' : adForm.id ? 'Güncelle' : 'Ekle'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Categories */}
       {tab === 'categories' && (
@@ -294,352 +566,6 @@ export default function AdminPage() {
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// AdsTab — reklam listeleme + ekleme formu
-// ---------------------------------------------------------------------------
-
-const PLACEMENTS: Ad['placement'][] = ['home', 'game_top', 'game_bottom', 'sidebar']
-const PLACEMENT_LABELS: Record<Ad['placement'], string> = {
-  home: 'Ana Sayfa',
-  game_top: 'Oyun Üstü',
-  game_bottom: 'Oyun Altı',
-  sidebar: 'Kenar',
-}
-
-const EMPTY_AD_FORM = {
-  placement: 'home' as Ad['placement'],
-  title: '',
-  content_html: '',
-  image_url: '',
-  target_url: '',
-  start_date: '',
-  end_date: '',
-}
-
-function AdsTab({
-  ads,
-  onToggleActive,
-  onDelete,
-  onRefresh,
-  currentUserId,
-}: {
-  ads: Ad[]
-  onToggleActive: (ad: Ad) => void
-  onDelete: (id: string) => void
-  onRefresh: () => void
-  currentUserId: string
-}) {
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(EMPTY_AD_FORM)
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [formSuccess, setFormSuccess] = useState<string | null>(null)
-  const [editId, setEditId] = useState<string | null>(null)
-
-  const resetForm = () => {
-    setForm(EMPTY_AD_FORM)
-    setFormError(null)
-    setFormSuccess(null)
-    setEditId(null)
-  }
-
-  const openEdit = (ad: Ad) => {
-    setForm({
-      placement: ad.placement,
-      title: ad.title ?? '',
-      content_html: ad.content_html ?? '',
-      image_url: ad.image_url ?? '',
-      target_url: ad.target_url ?? '',
-      start_date: ad.start_date ? ad.start_date.slice(0, 16) : '',
-      end_date: ad.end_date ? ad.end_date.slice(0, 16) : '',
-    })
-    setEditId(ad.id)
-    setFormError(null)
-    setFormSuccess(null)
-    setShowForm(true)
-  }
-
-  const handleSave = async () => {
-    setFormError(null)
-    setFormSuccess(null)
-
-    if (!form.title.trim() && !form.image_url.trim() && !form.content_html.trim()) {
-      setFormError('Başlık, görsel URL veya HTML içerikten en az biri zorunludur.')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const payload = {
-        placement: form.placement,
-        title: form.title.trim() || null,
-        content_html: form.content_html.trim() || null,
-        image_url: form.image_url.trim() || null,
-        target_url: form.target_url.trim() || null,
-        start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
-        end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }
-
-      let dbError: { message: string } | null = null
-
-      if (editId) {
-        const res = await supabase.from('ads').update(payload).eq('id', editId)
-        dbError = res.error
-      } else {
-        const res = await supabase.from('ads').insert({ ...payload, created_by: currentUserId })
-        dbError = res.error
-      }
-
-      if (dbError) {
-        setFormError(`Hata: ${dbError.message}`)
-      } else {
-        setFormSuccess(editId ? 'Reklam güncellendi.' : 'Reklam eklendi.')
-        resetForm()
-        setShowForm(false)
-        onRefresh()
-      }
-    } catch (err) {
-      setFormError('Beklenmeyen bir hata oluştu.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Yeni Reklam Butonu */}
-      <button
-        onClick={() => { resetForm(); setShowForm((v) => !v) }}
-        className="btn-accent flex items-center gap-2"
-      >
-        <Plus size={18} />
-        {showForm && !editId ? 'Formu Kapat' : 'Yeni Reklam Ekle'}
-      </button>
-
-      {/* Form */}
-      <AnimatePresence>
-        {showForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="glass-card p-5 space-y-4">
-              <h3 className="text-cream-100 font-semibold">
-                {editId ? 'Reklamı Düzenle' : 'Yeni Reklam'}
-              </h3>
-
-              {formError && (
-                <div role="alert" aria-live="assertive" className="p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm break-anywhere">
-                  {formError}
-                </div>
-              )}
-              {formSuccess && (
-                <div role="status" aria-live="polite" className="p-3 rounded-lg bg-success-500/10 border border-success-500/30 text-success-400 text-sm">
-                  {formSuccess}
-                </div>
-              )}
-
-              {/* Yerleşim */}
-              <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Yerleşim *</label>
-                <select
-                  value={form.placement}
-                  onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as Ad['placement'] }))}
-                  className="input-field"
-                >
-                  {PLACEMENTS.map((p) => (
-                    <option key={p} value={p} style={{ background: '#0a1428' }}>
-                      {PLACEMENT_LABELS[p]} ({p})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Başlık */}
-              <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Başlık</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Reklam başlığı"
-                  className="input-field"
-                />
-              </div>
-
-              {/* Görsel URL */}
-              <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Görsel URL</label>
-                <input
-                  type="url"
-                  inputMode="url"
-                  value={form.image_url}
-                  onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
-                  placeholder="https://example.com/banner.jpg"
-                  className="input-field"
-                />
-                {form.image_url && (
-                  <img
-                    src={form.image_url}
-                    alt="Önizleme"
-                    className="mt-2 rounded-lg max-h-32 object-cover"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                    onLoad={(e) => (e.currentTarget.style.display = 'block')}
-                  />
-                )}
-              </div>
-
-              {/* Hedef URL */}
-              <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Tıklama URL'si</label>
-                <input
-                  type="url"
-                  inputMode="url"
-                  value={form.target_url}
-                  onChange={(e) => setForm((f) => ({ ...f, target_url: e.target.value }))}
-                  placeholder="https://example.com"
-                  className="input-field"
-                />
-              </div>
-
-              {/* HTML İçerik */}
-              <div>
-                <label className="block text-sm text-primary-300 mb-1.5">
-                  HTML İçerik <span className="text-primary-500">(opsiyonel)</span>
-                </label>
-                <textarea
-                  value={form.content_html}
-                  onChange={(e) => setForm((f) => ({ ...f, content_html: e.target.value }))}
-                  placeholder="<p>Reklam içeriği...</p>"
-                  rows={3}
-                  className="input-field resize-y font-mono text-sm"
-                />
-              </div>
-
-              {/* Tarihler */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-primary-300 mb-1.5">Başlangıç Tarihi</label>
-                  <input
-                    type="datetime-local"
-                    value={form.start_date}
-                    onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-primary-300 mb-1.5">Bitiş Tarihi</label>
-                  <input
-                    type="datetime-local"
-                    value={form.end_date}
-                    onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
-                    className="input-field"
-                  />
-                </div>
-              </div>
-
-              {/* Kaydet / İptal */}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="btn-accent flex items-center gap-2"
-                >
-                  {saving ? (
-                    <span className="w-4 h-4 border-2 border-primary-900 border-t-transparent rounded-full animate-spin inline-block" />
-                  ) : (
-                    <Plus size={16} />
-                  )}
-                  {editId ? 'Güncelle' : 'Kaydet'}
-                </button>
-                <button
-                  onClick={() => { resetForm(); setShowForm(false) }}
-                  className="btn-ghost"
-                  disabled={saving}
-                >
-                  İptal
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Reklam Listesi */}
-      {ads.length === 0 ? (
-        <div className="glass-card p-8 text-center text-primary-400">
-          Henüz reklam eklenmemiş.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {ads.map((ad) => (
-            <div key={ad.id} className="glass-card p-3 flex items-center gap-3">
-              {ad.image_url && (
-                <img
-                  src={ad.image_url}
-                  alt={ad.title ?? 'Reklam'}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-14 h-10 rounded object-cover flex-shrink-0"
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="text-cream-100 text-sm font-medium truncate">
-                  {ad.title || <span className="text-primary-400 italic">Başlıksız</span>}
-                </div>
-                <div className="text-xs text-primary-400 flex items-center gap-2 flex-wrap mt-0.5">
-                  <span className="bg-primary-800 px-1.5 py-0.5 rounded">
-                    {PLACEMENT_LABELS[ad.placement]}
-                  </span>
-                  {ad.target_url && (
-                    <a
-                      href={ad.target_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent-400 underline truncate max-w-[140px]"
-                    >
-                      {ad.target_url}
-                    </a>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1 flex-shrink-0">
-                <button
-                  onClick={() => openEdit(ad)}
-                  className="p-2 rounded-lg text-primary-300 bg-primary-700/30 hover:bg-primary-700/60 transition-colors"
-                  title="Düzenle"
-                >
-                  <Edit size={14} />
-                </button>
-                <button
-                  onClick={() => onToggleActive(ad)}
-                  className={`p-2 rounded-lg transition-colors ${ad.is_active ? 'text-success-400 bg-success-500/10' : 'text-primary-400 bg-primary-700/30'}`}
-                  title={ad.is_active ? 'Devre Dışı Bırak' : 'Aktif Et'}
-                >
-                  <Power size={14} />
-                </button>
-                <button
-                  onClick={() => onDelete(ad.id)}
-                  className="p-2 rounded-lg text-error-400 bg-error-500/10 hover:bg-error-500/20 transition-colors"
-                  title="Sil"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 
 function StatCard({ label, value, icon: Icon, color }: {
   label: string
