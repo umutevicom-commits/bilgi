@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { AdBanner } from '../components/AdBanner'
+import { BorderBeam } from '../components/BorderBeam'
+import { AppLogo } from '../components/AppLogo'
 import type { GameSession, Category } from '../types'
 import {
   Play, Trophy, LogOut, LogIn, User, Crown, Star, Zap, BookOpen, Globe,
@@ -27,7 +29,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { user, profile, signOut, updateProfile } = useAuth()
+  const { user, profile, loading: authLoading, signOut, updateProfile } = useAuth()
   const isGuest = !user
   const [hasBreakSession, setHasBreakSession] = useState(false)
   const [breakSession, setBreakSession] = useState<GameSession | null>(null)
@@ -165,95 +167,124 @@ export default function HomePage() {
   return (
     <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto safe-bottom">
       {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between gap-3 mb-8 flex-wrap"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleAvatarClick}
-              disabled={isGuest || avatarUploading}
-              className={`relative block rounded-full ${!isGuest ? 'cursor-pointer group' : 'cursor-default'}`}
-              title={!isGuest ? 'Avatarı değiştir' : undefined}
-            >
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.username}
-                  decoding="async"
-                  className={`w-12 h-12 rounded-full object-cover ${profile.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}
+      {authLoading ? (
+        // Supabase oturumu doğrulanana kadar gerçek profil/"Misafir" durumunu
+        // hiç render etmiyoruz; bunun yerine aynı boyutlarda bir iskelet
+        // gösteriyoruz. Böylece sayfa yenilendiğinde önce "Misafir" yazıp
+        // sonra gerçek kullanıcıya dönen içerik sıçraması (ve buna bağlı
+        // avatar gölgesi/parıltısının ansızın değişmesiyle oluşan "overlay"
+        // hissi) tamamen ortadan kalkar.
+        <div className="flex items-center justify-between gap-3 mb-8 flex-wrap" aria-busy="true" aria-live="polite">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-full skeleton-block flex-shrink-0" />
+            <div className="min-w-0 space-y-2">
+              <div className="w-28 h-5 skeleton-block" />
+              <div className="w-20 h-3.5 skeleton-block" />
+            </div>
+          </div>
+          <div className="w-24 h-9 skeleton-block flex-shrink-0" />
+        </div>
+      ) : (
+        <motion.header
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between gap-3 mb-8 flex-wrap"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <AppLogo size={40} className="hidden sm:block" />
+            <div className="relative flex-shrink-0 rounded-full">
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                disabled={isGuest || avatarUploading}
+                className={`relative block rounded-full ${!isGuest ? 'cursor-pointer group' : 'cursor-default'}`}
+                title={!isGuest ? 'Avatarı değiştir' : undefined}
+              >
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.username}
+                    decoding="async"
+                    className={`w-12 h-12 rounded-full object-cover ${profile.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}
+                  />
+                ) : (
+                  <div className={`w-12 h-12 rounded-full bg-primary-700 flex items-center justify-center ${profile?.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}>
+                    <User size={24} className="text-primary-200" />
+                  </div>
+                )}
+                {!isGuest && (
+                  <div className={`absolute inset-0 rounded-full flex items-center justify-center bg-black/50 transition-opacity ${avatarUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {avatarUploading ? (
+                      <Loader2 size={16} className="text-cream-100 animate-spin" />
+                    ) : (
+                      <Camera size={16} className="text-cream-100" />
+                    )}
+                  </div>
+                )}
+              </button>
+              {!isGuest && (
+                <BorderBeam
+                  size={48}
+                  duration={4.5}
+                  borderWidth={2}
+                  colorFrom={profile?.is_online ? '#4ade80' : '#f5b041'}
+                  colorTo="#2a5a8e"
                 />
-              ) : (
-                <div className={`w-12 h-12 rounded-full bg-primary-700 flex items-center justify-center ${profile?.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}>
-                  <User size={24} className="text-primary-200" />
-                </div>
               )}
               {!isGuest && (
-                <div className={`absolute inset-0 rounded-full flex items-center justify-center bg-black/50 transition-opacity ${avatarUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                  {avatarUploading ? (
-                    <Loader2 size={16} className="text-cream-100 animate-spin" />
-                  ) : (
-                    <Camera size={16} className="text-cream-100" />
-                  )}
-                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  aria-label="Avatar yükle"
+                />
               )}
-            </button>
-            {!isGuest && (
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-                aria-label="Avatar yükle"
-              />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-cream-100 truncate">{profile?.username || 'Misafir'}</h2>
+                {getBadge()}
+              </div>
+              <div className="flex items-center gap-1 text-sm">
+                {Array.from({ length: getStars() }).map((_, i) => (
+                  <Star key={i} size={14} className="text-accent-400 fill-accent-400" />
+                ))}
+                <span className="text-primary-300 ml-1">{profile?.total_points || 0} puan</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {profile?.is_admin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="btn-accent text-sm flex items-center gap-1"
+              >
+                <Shield size={16} />
+                <span className="hidden sm:inline">Admin Paneli</span>
+              </button>
+            )}
+            {isGuest ? (
+              <button
+                onClick={() => navigate('/auth')}
+                className="btn-accent text-sm flex items-center gap-1"
+              >
+                <LogIn size={16} />
+                <span>Giriş Yap</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => signOut()}
+                className="btn-ghost text-sm flex items-center gap-1"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Çıkış</span>
+              </button>
             )}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-cream-100 truncate">{profile?.username || 'Misafir'}</h2>
-              {getBadge()}
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              {Array.from({ length: getStars() }).map((_, i) => (
-                <Star key={i} size={14} className="text-accent-400 fill-accent-400" />
-              ))}
-              <span className="text-primary-300 ml-1">{profile?.total_points || 0} puan</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {profile?.is_admin && (
-            <button
-              onClick={() => navigate('/admin')}
-              className="btn-accent text-sm flex items-center gap-1"
-            >
-              <Shield size={16} />
-              <span className="hidden sm:inline">Admin Paneli</span>
-            </button>
-          )}
-          {isGuest ? (
-            <button
-              onClick={() => navigate('/auth')}
-              className="btn-accent text-sm flex items-center gap-1"
-            >
-              <LogIn size={16} />
-              <span>Giriş Yap</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => signOut()}
-              className="btn-ghost text-sm flex items-center gap-1"
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Çıkış</span>
-            </button>
-          )}
-        </div>
-      </motion.header>
+        </motion.header>
+      )}
 
       {avatarError && (
         <div role="alert" aria-live="assertive" className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm text-center break-anywhere">
@@ -268,10 +299,13 @@ export default function HomePage() {
         transition={{ delay: 0.1 }}
         className="text-center mb-8"
       >
-        <h1 className="text-4xl sm:text-5xl font-bold text-cream-100 mb-2 text-balance">
-          Bilgi Yarışması
-        </h1>
-        <p className="text-primary-300">Sonsuz soru - Puan sistemi √</p>
+        <div className="relative inline-block rounded-2xl px-6 py-2 glass-card">
+          <h1 className="text-4xl sm:text-5xl font-bold text-cream-100 text-balance">
+            Bilgi Yarışması
+          </h1>
+          <BorderBeam size={100} duration={6.5} borderWidth={1.5} colorFrom="#f9cb72" colorTo="#4d7aa8" />
+        </div>
+        <p className="text-primary-300 mt-2">Sonsuz soru - Puan sistemi √</p>
       </motion.div>
 
       {/* Home Ad */}
@@ -323,38 +357,44 @@ export default function HomePage() {
       </div>
 
       {/* Category Selection Modal */}
-      {showCategorySelect && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4"
-          onClick={() => setShowCategorySelect(false)}
-        >
+      <AnimatePresence>
+        {showCategorySelect && (
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="glass-card p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto no-scrollbar"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+            onClick={() => setShowCategorySelect(false)}
           >
-            <h3 className="text-xl font-bold text-cream-100 mb-4 text-center">Kategori Seçin</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {categories.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.icon] || Globe
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.slug)}
-                    className="glass-card glass-card-hover p-4 flex flex-col items-center gap-2 text-center"
-                  >
-                    <Icon size={32} className="text-accent-400" />
-                    <span className="text-sm font-medium text-cream-100">{cat.name}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="glass-card p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto no-scrollbar"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold text-cream-100 mb-4 text-center">Kategori Seçin</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {categories.map((cat) => {
+                  const Icon = CATEGORY_ICONS[cat.icon] || Globe
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleCategorySelect(cat.slug)}
+                      className="glass-card glass-card-hover p-4 flex flex-col items-center gap-2 text-center"
+                    >
+                      <Icon size={32} className="text-accent-400" />
+                      <span className="text-sm font-medium text-cream-100">{cat.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">

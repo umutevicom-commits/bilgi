@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameEngine } from '../hooks/useGameEngine'
 import { AdBanner } from '../components/AdBanner'
+import { BorderBeam } from '../components/BorderBeam'
+import { playTick, playTimeUp } from '../lib/sound'
+import { vibrateTick, vibrateTimeUp } from '../lib/haptics'
 import { DIFFICULTY_LABELS, DIFFICULTY_POINTS, DIFFICULTY_COLORS } from '../types'
 import {
   Home, Coffee, Trophy, X, Users, Phone, Lightbulb,
@@ -13,6 +16,8 @@ import {
 const AUTO_ADVANCE_SECONDS_CORRECT = 3
 // Yanlış/süre dolduğunda doğru cevabı okuyabilmesi için biraz daha uzun süre
 const AUTO_ADVANCE_SECONDS_WRONG = 5
+// Geri sayımın bu saniyeden itibaren "kritik" (titreşim + tık sesi) sayılacağı eşik
+const URGENT_THRESHOLD_SECONDS = 10
 
 export default function GamePage() {
   const navigate = useNavigate()
@@ -90,6 +95,39 @@ export default function GamePage() {
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showResult, isCorrect, showEndModal, question?.id])
+
+  // Son 10 saniyede her saniye "tick" sesi + hafif titreşim. `timeLeft`
+  // zaten oyun motoru tarafından saniyede bir güncelleniyor; burada yalnızca
+  // o değişime tepki veriyoruz (yeni bir sayaç kurmuyoruz), böylece mevcut
+  // oyun mantığına dokunmadan salt sunum (UI) katmanında çalışıyor.
+  const lastTickedSecondRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (loading || showResult || !question) {
+      lastTickedSecondRef.current = null
+      return
+    }
+    if (
+      timeLeft > 0 &&
+      timeLeft <= URGENT_THRESHOLD_SECONDS &&
+      lastTickedSecondRef.current !== timeLeft
+    ) {
+      lastTickedSecondRef.current = timeLeft
+      playTick()
+      vibrateTick()
+    }
+  }, [timeLeft, showResult, loading, question])
+
+  // Süre tamamen dolduğunda (manuel cevaplamadan farklı olarak) tık
+  // sesinden belirgin şekilde farklı bir uyarı sesi + daha güçlü titreşim.
+  // Her soru için yalnızca bir kez tetiklenir.
+  const timeUpAlertedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (showResult && selectedAnswer === 'timeout' && question && timeUpAlertedForRef.current !== question.id) {
+      timeUpAlertedForRef.current = question.id
+      playTimeUp()
+      vibrateTimeUp()
+    }
+  }, [showResult, selectedAnswer, question])
 
   if (loading) {
     return (
@@ -170,8 +208,13 @@ export default function GamePage() {
       </div>
 
       {/* Timer */}
-      <div className="flex justify-center mb-6">
-        <div className="relative w-20 h-20">
+      <div className="flex justify-center mb-4">
+        <div
+          className={`relative w-20 h-20 ${
+            timeLeft <= URGENT_THRESHOLD_SECONDS && timeLeft > 0 && !showResult ? 'animate-timer-shake' : ''
+          }`}
+          style={{ transform: 'translateZ(0)' }}
+        >
           <svg className="timer-ring w-full h-full" viewBox="0 0 80 80">
             <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(168,189,212,0.1)" strokeWidth="4" />
             <circle
@@ -195,20 +238,21 @@ export default function GamePage() {
         key={question.id}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="question-card p-6 mb-6"
+        className="question-card relative p-4 sm:p-6 mb-4 overflow-hidden"
       >
-        <p className="text-lg sm:text-xl text-cream-100 text-center font-medium leading-relaxed text-balance break-anywhere">
+        <p className="text-base sm:text-xl text-cream-100 text-center font-medium leading-relaxed text-balance break-anywhere">
           {question.question_text}
         </p>
+        <BorderBeam size={140} duration={7} borderWidth={1.5} colorFrom="#f5b041" colorTo="#4d7aa8" />
       </motion.div>
 
       {/* Options */}
-      <div className="grid grid-cols-1 gap-3 mb-6">
+      <div className="grid grid-cols-1 gap-2 mb-4">
         {options.map((opt) => {
           const isEliminated = eliminatedOptions.includes(opt.key)
           const isSelected = selectedAnswer === opt.key
           const isCorrectAnswer = question.correct_answer === opt.key
-          let className = 'option-btn'
+          let className = 'option-btn p-3 sm:p-4'
           if (showResult) {
             if (isCorrectAnswer) className += ' option-correct'
             else if (isSelected) className += ' option-wrong'
@@ -228,8 +272,8 @@ export default function GamePage() {
               className={className}
               aria-label={`Seçenek ${opt.key}: ${opt.text}`}
             >
-              <div className="flex items-center gap-3">
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 ${
                   showResult && isCorrectAnswer
                     ? 'bg-success-500 text-white'
                     : showResult && isSelected
@@ -238,7 +282,7 @@ export default function GamePage() {
                 }`}>
                   {opt.key}
                 </span>
-                <span className="flex-1 break-anywhere">{opt.text}</span>
+                <span className="flex-1 text-sm sm:text-base leading-snug break-anywhere">{opt.text}</span>
               </div>
             </motion.button>
           )
@@ -250,7 +294,7 @@ export default function GamePage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-4 mb-4"
+          className="glass-card p-3 sm:p-4 mb-3"
         >
           <div className="text-sm text-primary-300 mb-2">İpucu sonucu:</div>
           <div className="space-y-1.5">
@@ -271,13 +315,13 @@ export default function GamePage() {
       )}
 
       {/* Lifelines */}
-      <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
+      <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 flex-wrap">
         <button
           onClick={useFiftyFifty}
           disabled={session.lifelines_used.fifty_fifty || showResult}
           className="btn-ghost text-sm flex flex-col items-center gap-1 disabled:opacity-30"
         >
-          <X size={20} />
+          <X size={18} />
           <span className="text-xs">50:50</span>
         </button>
         <button
@@ -285,7 +329,7 @@ export default function GamePage() {
           disabled={session.lifelines_used.audience || showResult}
           className="btn-ghost text-sm flex flex-col items-center gap-1 disabled:opacity-30"
         >
-          <Users size={20} />
+          <Users size={18} />
           <span className="text-xs">Seyirci</span>
         </button>
         <button
@@ -293,7 +337,7 @@ export default function GamePage() {
           disabled={session.lifelines_used.phone || showResult}
           className="btn-ghost text-sm flex flex-col items-center gap-1 disabled:opacity-30"
         >
-          <Phone size={20} />
+          <Phone size={18} />
           <span className="text-xs">Telefon</span>
         </button>
       </div>

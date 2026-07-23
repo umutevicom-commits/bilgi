@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { BorderBeam } from '../components/BorderBeam'
 import { Eye, EyeOff, Mail, Lock, User, Upload, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset'
@@ -126,10 +127,13 @@ export default function AuthPage() {
       >
         <div className="glass-card p-8 glow-primary">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-cream-100 mb-2">
-              Bilgi Yarışması
-            </h1>
-            <p className="text-primary-300 text-sm">
+            <div className="relative inline-block rounded-2xl px-5 py-2">
+              <h1 className="text-3xl font-bold text-cream-100">
+                Bilgi Yarışması
+              </h1>
+              <BorderBeam size={90} duration={6.5} borderWidth={1.5} colorFrom="#f9cb72" colorTo="#4d7aa8" />
+            </div>
+            <p className="text-primary-300 text-sm mt-2">
               {mode === 'login' && 'Hesabınıza giriş yapın'}
               {mode === 'register' && 'Yeni hesap oluşturun'}
               {mode === 'forgot' && 'Şifrenizi sıfırlayın'}
