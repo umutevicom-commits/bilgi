@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import type { Question, GameSession, DifficultyLevel } from '../types'
 import { DIFFICULTY_ORDER, DIFFICULTY_POINTS } from '../types'
 
-const QUESTION_TIME = 60
+const QUESTION_TIME = 45
 
 export function useGameEngine(category: string) {
   const { user, profile, refreshProfile } = useAuth()
@@ -26,132 +26,40 @@ export function useGameEngine(category: string) {
     return DIFFICULTY_ORDER[index % DIFFICULTY_ORDER.length]
   }
 
-  // Bir soru havuzu içinde rastgele seçim yapar.
-  const pickRandom = (rows: Question[] | null): Question | null => {
-    if (!rows || rows.length === 0) return null
-    return rows[Math.floor(Math.random() * rows.length)] as Question
-  }
-
-  // ÖNEMLİ: Bu fonksiyon "used" setindeki hiçbir soruyu ASLA döndürmez.
-  // Dışlama (exclude) filtresi normalde doğrudan veritabanı sorgusunda
-  // uygulanır (hızlı yol). Kullanıcının gördüğü soru sayısı çok büyüdüğünde
-  // (yüzlerce/binlerce) tek bir sorgu URL'sine tüm id'leri gömmek pratik
-  // değildir; bu durumda otomatik olarak sayfalı + istemci tarafı filtrelemeye
-  // düşer (yavaş ama %100 güvenilir yol). Hangi yol kullanılırsa kullanılsın,
-  // sonuç kümesinde "used" içindeki hiçbir id asla bulunmaz.
-  const EXCLUDE_URL_SAFE_LIMIT = 300
-  const POOL_PAGE_SIZE = 1000
-
   const fetchQuestion = useCallback(async (difficulty: DifficultyLevel, cat: string, used: Set<string>) => {
-    const excludeIds = Array.from(used)
+    let query = supabase
+      .from('questions')
+      .select('*')
+      .eq('difficulty', difficulty)
+      .eq('is_active', true)
 
-    const buildQuery = (withCategory: boolean) => {
-      let q = supabase
+    if (cat !== 'karisik') {
+      query = query.eq('category', cat)
+    }
+
+    const { data, error } = await query.limit(50)
+
+    if (error) throw error
+
+    const available = (data || []).filter((q) => !used.has(q.id))
+
+    if (available.length === 0) {
+      if (data && data.length > 0) {
+        return data[Math.floor(Math.random() * data.length)] as Question
+      }
+      const { data: anyData, error: anyError } = await supabase
         .from('questions')
         .select('*')
-        .eq('difficulty', difficulty)
         .eq('is_active', true)
-
-      if (withCategory && cat !== 'karisik') {
-        q = q.eq('category', cat)
+        .limit(50)
+      if (anyError) throw anyError
+      if (anyData && anyData.length > 0) {
+        return anyData[Math.floor(Math.random() * anyData.length)] as Question
       }
-      if (excludeIds.length > 0 && excludeIds.length <= EXCLUDE_URL_SAFE_LIMIT) {
-        const list = excludeIds.map((id) => `"${id}"`).join(',')
-        q = q.not('id', 'in', `(${list})`)
-      }
-      return q.limit(200)
+      return null
     }
 
-    // Hariç tutma listesi URL için güvenli olmayacak kadar büyükse, tüm
-    // havuzu sayfalayarak çekip istemci tarafında filtreliyoruz. Bu yol
-    // yavaştır ama her koşulda doğru sonucu garanti eder.
-    const fetchPoolFiltered = async (withCategory: boolean) => {
-      const all: Question[] = []
-      let from = 0
-      for (let page = 0; page < 50; page++) {
-        let q = supabase.from('questions').select('*').eq('difficulty', difficulty).eq('is_active', true)
-        if (withCategory && cat !== 'karisik') q = q.eq('category', cat)
-        const { data, error } = await q.range(from, from + POOL_PAGE_SIZE - 1)
-        if (error) throw error
-        if (!data || data.length === 0) break
-        all.push(...(data as Question[]))
-        if (data.length < POOL_PAGE_SIZE) break
-        from += POOL_PAGE_SIZE
-      }
-      return all.filter((row) => !used.has(row.id))
-    }
-
-    const runTier = async (withCategory: boolean) => {
-      if (excludeIds.length > EXCLUDE_URL_SAFE_LIMIT) {
-        const rows = await fetchPoolFiltered(withCategory)
-        return pickRandom(rows)
-      }
-      const { data, error } = await buildQuery(withCategory)
-      if (error) throw error
-      return pickRandom(data as Question[] | null)
-    }
-
-    // 1) Aynı zorluk + aynı kategori, daha önce hiç sorulmamış sorular
-    const primaryPick = await runTier(true)
-    if (primaryPick) return primaryPick
-
-    // 2) Kategoriye özel havuz tükendiyse, aynı zorlukta diğer kategorilere bak
-    //    (yalnızca belirli bir kategori seçiliyse anlamlı; "karışık"ta zaten aynı sorgu)
-    if (cat !== 'karisik') {
-      const byDifficultyPick = await runTier(false)
-      if (byDifficultyPick) return byDifficultyPick
-    }
-
-    // 3) Bu zorlukta gösterilecek hiç yeni soru kalmadı. Daha önce sorulmuş
-    // bir soruyu tekrar göstermek yerine null döndürüyoruz.
-    return null
-  }, [])
-
-  // ÖNEMLİ: "Görülen soru" kaydı artık Supabase'deki `user_seen_questions`
-  // tablosunda TUTULUR (bkz. migration: 20260723090000_user_seen_questions.sql).
-  // Bu, tarayıcı önbelleği temizlense, farklı bir cihazdan girilse veya
-  // uygulama yeniden yüklense bile aynı kullanıcıya aynı sorunun BİR DAHA ASLA
-  // gösterilmemesini garanti eder (localStorage gibi yerel/geçici bir
-  // çözümün aksine, kalıcıdır ve hesaba bağlıdır).
-
-  // Kullanıcının bugüne kadar gördüğü TÜM soruların id'lerini yükler.
-  // Supabase tek istekte sınırlı satır döndürdüğü için sayfalama yapılır.
-  const SEEN_PAGE_SIZE = 1000
-  const loadSeenQuestionIds = useCallback(async (userId: string): Promise<Set<string>> => {
-    const seen = new Set<string>()
-    let from = 0
-    // Güvenlik amaçlı üst sınır (sonsuz döngüye karşı) - normalde hiç ulaşılmaz.
-    for (let page = 0; page < 200; page++) {
-      const { data, error } = await supabase
-        .from('user_seen_questions')
-        .select('question_id')
-        .eq('user_id', userId)
-        .range(from, from + SEEN_PAGE_SIZE - 1)
-      if (error) {
-        console.error('Görülen sorular yüklenemedi:', error)
-        break
-      }
-      if (!data || data.length === 0) break
-      for (const row of data as { question_id: string }[]) seen.add(row.question_id)
-      if (data.length < SEEN_PAGE_SIZE) break
-      from += SEEN_PAGE_SIZE
-    }
-    return seen
-  }, [])
-
-  // Bir soru kullanıcıya gösterildiği an kalıcı olarak "görüldü" işaretlenir.
-  // upsert + ignoreDuplicates: aynı çift zaten varsa sessizce yok sayılır,
-  // hata fırlatmaz.
-  const markQuestionSeen = useCallback((userId: string, questionId: string) => {
-    supabase
-      .from('user_seen_questions')
-      .upsert(
-        { user_id: userId, question_id: questionId },
-        { onConflict: 'user_id,question_id', ignoreDuplicates: true }
-      )
-      .then(({ error }) => {
-        if (error) console.error('Soru "görüldü" olarak işaretlenemedi:', error)
-      })
+    return available[Math.floor(Math.random() * available.length)] as Question
   }, [])
 
   const startNewGame = useCallback(async () => {
@@ -177,65 +85,40 @@ export function useGameEngine(category: string) {
       if (error) throw error
 
       setSession(data as GameSession)
+      setUsedQuestions(new Set())
       setStreak(0)
 
-      // Kullanıcının bugüne kadar (geçmiş tüm oyunlar dahil) gördüğü sorular
-      // kalıcı depodan yüklenir; yeni oyun bu listeyi asla sıfırlamaz.
-      const seen = await loadSeenQuestionIds(user.id)
-      setUsedQuestions(seen)
-
       const diff = currentDifficulty(0)
-      const q = await fetchQuestion(diff, category, seen)
-      if (!q) {
-        setError('Bu kategori/zorlukta gösterilecek yeni soru kalmadı. Tüm soruları tamamlamış olabilirsiniz.')
-        return
-      }
+      const q = await fetchQuestion(diff, category, new Set())
       setQuestion(q)
       setTimeLeft(QUESTION_TIME)
       setSelectedAnswer(null)
       setShowResult(false)
       setEliminatedOptions([])
       setAudienceHint(null)
-      // Soru ekrana gelir gelmez kalıcı olarak "görüldü" işaretlenir; kullanıcı
-      // cevaplamadan çıksa bile bu soru bir daha asla karşısına çıkmaz.
-      setUsedQuestions((prev) => new Set(prev).add(q.id))
-      markQuestionSeen(user.id, q.id)
     } catch (err) {
       setError('Oyun başlatılamadı. Lütfen tekrar deneyin.')
     } finally {
       setLoading(false)
     }
-  }, [user, category, fetchQuestion, loadSeenQuestionIds, markQuestionSeen])
+  }, [user, category, fetchQuestion])
 
   const resumeGame = useCallback(async (existingSession: GameSession) => {
-    if (!user) return
     setLoading(true)
     setError(null)
     setSession(existingSession)
     setStreak(0)
 
-    // Kalıcı depodan (Supabase) yüklenir; "ara ver" öncesi hangi cihazda
-    // oynanmış olursa olsun, kullanıcının gördüğü hiçbir soru tekrar gelmez.
-    const seen = await loadSeenQuestionIds(user.id)
-    setUsedQuestions(seen)
-
     const diff = currentDifficulty(existingSession.difficulty_index)
-    const q = await fetchQuestion(diff, existingSession.category, seen)
-    if (!q) {
-      setError('Bu kategori/zorlukta gösterilecek yeni soru kalmadı. Tüm soruları tamamlamış olabilirsiniz.')
-      setLoading(false)
-      return
-    }
+    const q = await fetchQuestion(diff, existingSession.category, new Set())
     setQuestion(q)
     setTimeLeft(QUESTION_TIME)
     setSelectedAnswer(null)
     setShowResult(false)
     setEliminatedOptions([])
     setAudienceHint(null)
-    setUsedQuestions((prev) => new Set(prev).add(q.id))
-    markQuestionSeen(user.id, q.id)
     setLoading(false)
-  }, [user, fetchQuestion, loadSeenQuestionIds, markQuestionSeen])
+  }, [fetchQuestion])
 
   const nextQuestion = useCallback(async () => {
     if (!session || !user) return
@@ -251,10 +134,7 @@ export function useGameEngine(category: string) {
 
     const newUsed = new Set(usedQuestions)
     if (question) newUsed.add(question.id)
-    newUsed.add(q.id)
     setUsedQuestions(newUsed)
-    // Yeni soru ekrana gelir gelmez kalıcı olarak işaretlenir.
-    markQuestionSeen(user.id, q.id)
 
     const { error: updateError } = await supabase
       .from('game_sessions')
@@ -279,7 +159,7 @@ export function useGameEngine(category: string) {
     setShowResult(false)
     setEliminatedOptions([])
     setAudienceHint(null)
-  }, [session, user, usedQuestions, question, fetchQuestion, markQuestionSeen])
+  }, [session, user, usedQuestions, question, fetchQuestion])
 
   const answerQuestion = useCallback(async (answer: string) => {
     if (!question || !session || !user || showResult) return
