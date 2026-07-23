@@ -3,19 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { Profile, Question, Ad, Category, SiteSetting } from '../types'
+import type { Profile, Ad, Category, SiteSetting } from '../types'
 import {
   LayoutDashboard, Users, Ban, Clock, Image, Settings, FolderTree,
   HelpCircle, Award, BarChart3, LogOut, Plus, Trash2, Edit, Power, X,
   type LucideIcon,
 } from 'lucide-react'
 
-type AdminTab = 'dashboard' | 'users' | 'questions' | 'ads' | 'categories' | 'settings' | 'stats'
+type AdminTab = 'dashboard' | 'users' | 'ads' | 'categories' | 'settings' | 'stats'
 
 const TABS: { key: AdminTab; label: string; icon: LucideIcon }[] = [
   { key: 'dashboard', label: 'Panel', icon: LayoutDashboard },
   { key: 'users', label: 'Kullanıcılar', icon: Users },
-  { key: 'questions', label: 'Sorular', icon: HelpCircle },
   { key: 'ads', label: 'Reklamlar', icon: Image },
   { key: 'categories', label: 'Kategoriler', icon: FolderTree },
   { key: 'settings', label: 'Ayarlar', icon: Settings },
@@ -34,58 +33,56 @@ export default function AdminPage() {
   const { profile, signOut } = useAuth()
   const [tab, setTab] = useState<AdminTab>('dashboard')
   const [users, setUsers] = useState<Profile[]>([])
-  const [questions, setQuestions] = useState<Question[]>([])
   const [ads, setAds] = useState<Ad[]>([])
   const [adForm, setAdForm] = useState<Partial<Ad> | null>(null)
   const [adSaving, setAdSaving] = useState(false)
   const [adError, setAdError] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [settings, setSettings] = useState<SiteSetting[]>([])
-  const [stats, setStats] = useState({ totalUsers: 0, totalQuestions: 0, totalGames: 0, totalPoints: 0 })
+  const [stats, setStats] = useState({ totalUsers: 0, totalGames: 0, totalPoints: 0 })
 
-  const fetchAll = useCallback(async () => {
-    const [usersRes, questionsRes, adsRes, categoriesRes, settingsRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(100),
-      supabase.from('ads').select('*').order('created_at', { ascending: false }),
-      supabase.from('categories').select('*').order('display_order', { ascending: true }),
-      supabase.from('site_settings').select('*'),
-    ])
-
-    if (usersRes.data) setUsers(usersRes.data as Profile[])
-    if (questionsRes.data) setQuestions(questionsRes.data as Question[])
-    if (adsRes.data) setAds(adsRes.data as Ad[])
-    if (categoriesRes.data) setCategories(categoriesRes.data as Category[])
-    if (settingsRes.data) setSettings(settingsRes.data as SiteSetting[])
-
-    setStats({
-      totalUsers: usersRes.data?.length || 0,
-      totalQuestions: questionsRes.data?.length || 0,
-      totalGames: (usersRes.data as Profile[] | null)?.reduce((sum, u) => sum + u.games_played, 0) || 0,
-      totalPoints: (usersRes.data as Profile[] | null)?.reduce((sum, u) => sum + u.total_points, 0) || 0,
-    })
+  const fetchUsers = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    if (data) {
+      setUsers(data as Profile[])
+      setStats({
+        totalUsers: data.length,
+        totalGames: (data as Profile[]).reduce((sum, u) => sum + u.games_played, 0),
+        totalPoints: (data as Profile[]).reduce((sum, u) => sum + u.total_points, 0),
+      })
+    }
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  const fetchAds = useCallback(async () => {
+    const { data } = await supabase.from('ads').select('*').order('created_at', { ascending: false })
+    if (data) setAds(data as Ad[])
+  }, [])
+
+  const fetchCategories = useCallback(async () => {
+    const { data } = await supabase.from('categories').select('*').order('display_order', { ascending: true })
+    if (data) setCategories(data as Category[])
+  }, [])
+
+  const fetchSettings = useCallback(async () => {
+    const { data } = await supabase.from('site_settings').select('*')
+    if (data) setSettings(data as SiteSetting[])
+  }, [])
+
+  useEffect(() => {
+    fetchUsers()
+    fetchAds()
+    fetchCategories()
+    fetchSettings()
+  }, [fetchUsers, fetchAds, fetchCategories, fetchSettings])
 
   const toggleBan = async (user: Profile) => {
+    setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_banned: !u.is_banned } : u))
     await supabase.from('profiles').update({ is_banned: !user.is_banned }).eq('id', user.id)
-    fetchAll()
   }
 
   const toggleAdmin = async (user: Profile) => {
+    setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_admin: !u.is_admin } : u))
     await supabase.from('profiles').update({ is_admin: !user.is_admin }).eq('id', user.id)
-    fetchAll()
-  }
-
-  const deleteQuestion = async (id: string) => {
-    await supabase.from('questions').delete().eq('id', id)
-    fetchAll()
-  }
-
-  const toggleQuestionActive = async (q: Question) => {
-    await supabase.from('questions').update({ is_active: !q.is_active }).eq('id', q.id)
-    fetchAll()
   }
 
   const openNewAdForm = () => {
@@ -124,48 +121,48 @@ export default function AdminPage() {
       end_date: adForm.end_date || null,
     }
 
-    const { error } = adForm.id
-      ? await supabase.from('ads').update(payload).eq('id', adForm.id)
-      : await supabase.from('ads').insert(payload)
-
-    setAdSaving(false)
-
-    if (error) {
-      setAdError(error.message)
-      return
+    if (adForm.id) {
+      const { data, error } = await supabase.from('ads').update(payload).eq('id', adForm.id).select().single()
+      setAdSaving(false)
+      if (error) { setAdError(error.message); return }
+      if (data) setAds((prev) => prev.map((a) => a.id === adForm.id ? data as Ad : a))
+    } else {
+      const { data, error } = await supabase.from('ads').insert(payload).select().single()
+      setAdSaving(false)
+      if (error) { setAdError(error.message); return }
+      if (data) setAds((prev) => [data as Ad, ...prev])
     }
 
     closeAdForm()
-    fetchAll()
   }
 
   const deleteAd = async (id: string) => {
     if (!window.confirm('Bu reklamı silmek istediğinizden emin misiniz?')) return
+    setAds((prev) => prev.filter((a) => a.id !== id))
     const { error } = await supabase.from('ads').delete().eq('id', id)
     if (error) {
       setAdError(error.message)
-      return
+      fetchAds()
     }
-    fetchAll()
   }
 
   const toggleAdActive = async (ad: Ad) => {
+    setAds((prev) => prev.map((a) => a.id === ad.id ? { ...a, is_active: !a.is_active } : a))
     const { error } = await supabase.from('ads').update({ is_active: !ad.is_active }).eq('id', ad.id)
     if (error) {
       setAdError(error.message)
-      return
+      fetchAds()
     }
-    fetchAll()
   }
 
   const toggleCategoryActive = async (cat: Category) => {
+    setCategories((prev) => prev.map((c) => c.id === cat.id ? { ...c, is_active: !c.is_active } : c))
     await supabase.from('categories').update({ is_active: !cat.is_active }).eq('id', cat.id)
-    fetchAll()
   }
 
   const updateSetting = async (key: string, value: string) => {
+    setSettings((prev) => prev.map((s) => s.key === key ? { ...s, value } : s))
     await supabase.from('site_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', key)
-    fetchAll()
   }
 
   return (
@@ -210,9 +207,9 @@ export default function AdminPage() {
       {tab === 'dashboard' && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Kullanıcı" value={stats.totalUsers} icon={Users} color="text-primary-300" />
-          <StatCard label="Sorular" value={stats.totalQuestions} icon={HelpCircle} color="text-accent-400" />
           <StatCard label="Oyunlar" value={stats.totalGames} icon={Award} color="text-success-400" />
           <StatCard label="Toplam Puan" value={stats.totalPoints} icon={BarChart3} color="text-cream-400" />
+          <StatCard label="Reklamlar" value={ads.length} icon={Image} color="text-accent-400" />
         </div>
       )}
 
@@ -253,38 +250,6 @@ export default function AdminPage() {
                 >
                   <Power size={16} />
                 </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Questions */}
-      {tab === 'questions' && (
-        <div className="space-y-2">
-          {questions.map((q) => (
-            <div key={q.id} className="glass-card p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-cream-100 text-sm font-medium truncate">{q.question_text}</p>
-                  <div className="text-xs text-primary-400 mt-1">
-                    {q.category} · {q.difficulty} · {q.correct_answer}
-                  </div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => toggleQuestionActive(q)}
-                    className={`p-2 rounded-lg ${q.is_active ? 'text-success-400 bg-success-500/10' : 'text-primary-400 bg-primary-700/30'}`}
-                  >
-                    <Power size={14} />
-                  </button>
-                  <button
-                    onClick={() => deleteQuestion(q.id)}
-                    className="p-2 rounded-lg text-error-400 bg-error-500/10"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
               </div>
             </div>
           ))}
@@ -546,9 +511,9 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <StatCard label="Toplam Kullanıcı" value={stats.totalUsers} icon={Users} color="text-primary-300" />
-            <StatCard label="Toplam Soru" value={stats.totalQuestions} icon={HelpCircle} color="text-accent-400" />
             <StatCard label="Toplam Oyun" value={stats.totalGames} icon={Award} color="text-success-400" />
             <StatCard label="Toplam Puan" value={stats.totalPoints} icon={BarChart3} color="text-cream-400" />
+            <StatCard label="Reklamlar" value={ads.length} icon={Image} color="text-accent-400" />
           </div>
           <div className="glass-card p-4">
             <h3 className="text-cream-100 font-semibold mb-3">En İyi 10 Kullanıcı</h3>
