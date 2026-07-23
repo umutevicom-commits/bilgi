@@ -127,7 +127,7 @@ export default function AuthPage() {
         <div className="glass-card p-8 glow-primary">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-cream-100 mb-2">
-              Kim Milyoner Olmak İster
+              Bilgi Yarışması
             </h1>
             <p className="text-primary-300 text-sm">
               {mode === 'login' && 'Hesabınıza giriş yapın'}
