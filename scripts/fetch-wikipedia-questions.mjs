@@ -10,7 +10,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-const USER_AGENT = 'KimMilyonerBot/3.0 (+https://kimmilyoner.eu.cc; educational quiz generator)'
+const USER_AGENT = 'BilgiYarismasiBot/3.0 (educational quiz generator)'
 const WIKI_API = 'https://tr.wikipedia.org/api/rest_v1/page/summary/'
 const WIKI_SEARCH_API = 'https://tr.wikipedia.org/w/api.php'
 const WIKI_RANDOM_API = 'https://tr.wikipedia.org/api/rest_v1/page/random/summary'
@@ -382,11 +382,12 @@ function cleanSentence(raw) {
   return text
 }
 
-function truncate(text, maxLen) {
-  if (text.length <= maxLen) return text
-  const cut = text.slice(0, maxLen)
-  const lastSpace = cut.lastIndexOf(' ')
-  return (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).trim() + '…'
+// Metin ASLA '…' ile kesilerek bozulmaz: belirtilen sınıra sığmayan aday
+// tamamen reddedilir (null döner), üretim akışı bunun yerine başka bir
+// cümle/konu dener. Bu sayede ekranda gösterilen her soru ve şık HER ZAMAN
+// eksiksiz, baştan sona doğru bir metindir.
+function fitsLimit(text, maxLen) {
+  return typeof text === 'string' && text.trim().length > 0 && text.length <= maxLen
 }
 
 // Wikipedia extract metnini cümlelere böler.
@@ -467,6 +468,7 @@ function letterFor(index) {
 }
 
 function buildQuestionRecord({ category, difficulty, questionText, correctText, wrongTexts, explanation, sourceUrl, sourceTitle }) {
+  if (!fitsLimit(questionText, 220)) return null
   if (!isUsableOption(correctText)) return null
   const validWrongs = wrongTexts.filter(isUsableOption)
   if (validWrongs.length < 3) return null
@@ -489,7 +491,7 @@ function buildQuestionRecord({ category, difficulty, questionText, correctText, 
   return {
     category,
     difficulty,
-    question_text: truncate(questionText, 220),
+    question_text: questionText,
     option_a: allAnswers[0],
     option_b: allAnswers[1],
     option_c: allAnswers[2],
@@ -510,8 +512,8 @@ function generateDefinitionQuestion({ article, sentences, distractorSentences, d
   const factSentence = pickFactSentence(sentences, difficulty)
   if (!factSentence) return null
 
-  const correctText = truncate(factSentence, 140)
-  const wrongTexts = pickN(distractorSentences, Math.min(distractorSentences.length, 6)).map((s) => truncate(s, 140))
+  const correctText = factSentence
+  const wrongTexts = pickN(distractorSentences, Math.min(distractorSentences.length, 6))
 
   const template = DEFINITION_TEMPLATES[Math.floor(Math.random() * DEFINITION_TEMPLATES.length)]
 
@@ -521,7 +523,7 @@ function generateDefinitionQuestion({ article, sentences, distractorSentences, d
     questionText: template(article.title),
     correctText,
     wrongTexts,
-    explanation: `Kaynak: Wikipedia - ${article.title}`,
+    explanation: 'Bu bilgi, genel kültür bilgi havuzumuzdan derlenmiştir.',
     sourceUrl: article.content_urls?.desktop?.page || `https://tr.wikipedia.org/wiki/${encodeURIComponent(article.title)}`,
     sourceTitle: article.title,
   })
@@ -561,7 +563,8 @@ function generateYearQuestion({ article, sentences, difficulty, category }) {
   }
   if (wrongYears.size < 3) return null
 
-  const questionSentenceContext = truncate(pick.sentence.replace(String(correctYear), '____'), 150)
+  const questionSentenceContext = pick.sentence.replace(String(correctYear), '____')
+  if (!fitsLimit(questionSentenceContext, 150)) return null
   const template = YEAR_TEMPLATES[Math.floor(Math.random() * YEAR_TEMPLATES.length)]
 
   return buildQuestionRecord({
