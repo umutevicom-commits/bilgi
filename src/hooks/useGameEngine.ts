@@ -22,6 +22,9 @@ export function useGameEngine(category: string) {
   const [audienceHint, setAudienceHint] = useState<Record<string, number> | null>(null)
   const [streak, setStreak] = useState(0)
   const [questionsPool, setQuestionsPool] = useState<Question[]>([])
+  // questions.json fetch'i bitmeden startNewGame/resumeGame'in tetiklenip
+  // "havuz boş" hatası vermesini engellemek için ayrı bir yüklendi bayrağı.
+  const [questionsLoaded, setQuestionsLoaded] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const currentDifficulty = (index: number): DifficultyLevel => {
@@ -32,7 +35,10 @@ export function useGameEngine(category: string) {
   useEffect(() => {
     let cancelled = false
     loadQuestions().then((qs) => {
-      if (!cancelled) setQuestionsPool(qs)
+      if (!cancelled) {
+        setQuestionsPool(qs)
+        setQuestionsLoaded(true)
+      }
     })
     return () => { cancelled = true }
   }, [])
@@ -352,7 +358,9 @@ export function useGameEngine(category: string) {
 
   // Check for existing session
   useEffect(() => {
-    if (!user) return
+    // Soru havuzu (questions.json) henüz yüklenmediyse bekle; aksi halde
+    // startNewGame boş havuzla çalışıp gereksiz yere hata veriyordu.
+    if (!user || !questionsLoaded) return
 
     const checkExisting = async () => {
       const { data, error } = await supabase
@@ -372,7 +380,7 @@ export function useGameEngine(category: string) {
     }
 
     checkExisting()
-  }, [user])
+  }, [user, questionsLoaded])
 
   return {
     session,
