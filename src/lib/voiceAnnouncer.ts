@@ -1,34 +1,41 @@
 /**
- * Tarayıcı yerleşik SpeechSynthesis (Web Speech API) tabanlı Türkçe sesli
- * anlatıcı ("spiker").
+ * Oyunun sesli anlatıcısı ("spiker").
  *
+ * MOTOR: Piper TTS (birincil) + tarayıcı SpeechSynthesis (güvenli düşme)
+ * -----------------------------------------------------------------------
  * NEDEN VibeVoice / Kokoro DEĞİL:
  * microsoft/VibeVoice, Python + PyTorch + GPU gerektiren, "podcast tarzı"
- * uzun-form ses üretimi için tasarlanmış ağır bir araştırma modelidir.
- * hexgrad/Kokoro-82M ise tarayıcıda (ONNX/WASM) sunucusuz çalışabilse de
- * resmi olarak Türkçe desteklemiyor — G2P ve eğitim verisi zayıf/yok, ilk
- * yüklemede onlarca-yüzlerce MB model indirmesi gerekiyor. Bu proje statik
- * bir React/Vite uygulaması olarak GitHub Pages üzerinde çalışıyor —
- * arkasında sunucu/GPU yok ve spiker illa Türkçe konuşmalı. Bu yüzden her
- * ikisi de bu proje için uygun değil.
+ * uzun-form ses üretimi için tasarlanmış ağır bir araştırma modelidir ve
+ * sunucusuz çalışmaz. hexgrad/Kokoro-82M ise tarayıcıda (ONNX/WASM)
+ * sunucusuz çalışabilse de resmi olarak Türkçe desteklemiyor. Bu proje
+ * statik bir React/Vite uygulaması olarak GitHub Pages üzerinde çalışıyor
+ * — arkasında sunucu/GPU yok ve spiker illa Türkçe konuşmalı. İkisi de bu
+ * proje için uygun değil.
  *
- * Bunun yerine tarayıcının kendi `speechSynthesis` motorunu kullanıyoruz,
- * ama "düz metni tek seferde oku" yaklaşımından daha fazlasını yapıyoruz:
- * - En kaliteli tr-TR sesini otomatik seçiyoruz (Natural/Online/Neural
- *   etiketli sesler varsa onları, yoksa en iyi eşleşeni)
- * - Cümleyi noktalama işaretlerine göre parçalara bölüp aralarına küçük,
- *   rastgele "nefes" boşlukları koyuyoruz (nokta sonrası daha uzun,
- *   virgül sonrası daha kısa duraklama)
- * - Her cümlecikte hız/perdeyi hafifçe (±%3) rastgele oynatarak art arda
- *   birebir aynı tonlamayı tekrar etmesini engelliyoruz
- * - Aynı kategori içinde art arda aynı cümlenin seçilmesini engelliyoruz
- * - Tüm konuşmalar tek bir kuyruktan akıyor; "kes ve yenisini söyle"
- *   anlarında (yanlış cevap, süre uyarısı vb.) kuyruk temiz şekilde
- *   sıfırlanıyor, üst üste binme olmuyor
+ * NEDEN Piper TTS:
+ * Piper (rhasspy/piper), resmi "medium" kalitede üç Türkçe sesi olan,
+ * WebAssembly ile tamamen tarayıcıda çalışabilen, VITS tabanlı hafif bir
+ * nöral TTS modelidir (@mintplex-labs/piper-tts-web paketi). Sunucu/GPU
+ * gerekmez, GitHub Pages ile tam uyumludur. Tek maliyeti: ilk kullanımda
+ * ~60MB'lık ses modelinin indirilip tarayıcıda önbelleğe alınmasıdır
+ * (bkz. piperEngine.ts).
  *
- * Ek sunucu/GPU gerektirmez, tamamen ücretsizdir, gecikmesi neredeyse
- * sıfırdır (oyunun akışını bozmaz).
+ * "SORUNSUZ" NASIL SAĞLANIYOR:
+ * Piper modeli indirilene kadar (birkaç saniyeden bir dakikaya kadar
+ * sürebilir) ya da bir cihazda/tarayıcıda WASM/OPFS desteklenmiyorsa,
+ * bu dosya otomatik olarak tarayıcının kendi SpeechSynthesis motoruna
+ * geçer. Oyuncu asla sessiz kalmaz; sadece model hazır olduğunda ses
+ * sessizce Piper'ın daha doğal tonuna "yükselir". Bu geçiş kullanıcıya
+ * hiçbir ek işlem yaptırmadan, arka planda gerçekleşir.
  */
+
+import {
+  primePiper,
+  isPiperReady,
+  enqueuePiper,
+  stopPiper,
+  type PiperProgress,
+} from './piperEngine'
 
 type SpeakOptions = {
   rate?: number
@@ -57,9 +64,8 @@ function isSupported(): boolean {
 
 /**
  * Bir tr sesine "ne kadar kaliteli/doğal" olabileceğine dair kaba bir puan
- * verir. Tarayıcılar genelde birden fazla tr sesi sunar (örn. düşük
- * kaliteli yerel eSpeak sesi + yüksek kaliteli bulut tabanlı "Natural"
- * sesi); mümkün olan en iyisini otomatik seçmeye çalışıyoruz.
+ * verir. Bu yalnızca Piper hazır olana kadar (veya Piper hiç
+ * kullanılamıyorsa) devrede olan tarayıcı motoru için geçerlidir.
  */
 function scoreVoice(v: SpeechSynthesisVoice): number {
   const name = v.name.toLowerCase()
@@ -86,11 +92,6 @@ function pickTurkishVoice(): SpeechSynthesisVoice | null {
   return trVoices.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0]
 }
 
-/**
- * Tarayıcılarda ses listesi (voices) genelde ASENKRON yüklenir. İlk
- * çağrıda boş dönebilir; bu yüzden hem hemen denemeyi hem de
- * `onvoiceschanged` olayını dinlemeyi birlikte yapıyoruz.
- */
 function ensureVoicesLoaded() {
   if (!isSupported() || voicesReady) return
   const found = pickTurkishVoice()
@@ -125,12 +126,28 @@ export function setVoiceEnabled(value: boolean): void {
   if (!value) stopSpeaking()
 }
 
-/** İlk kullanıcı etkileşiminde (buton tıklaması vb.) çağrılmalı. */
+/**
+ * İlk kullanıcı etkileşiminde (buton tıklaması vb.) çağrılmalı.
+ * Tarayıcı sesini anında hazırlar VE Piper modelinin indirilmesini arka
+ * planda başlatır — oyun bu indirmeyi beklemez, hazır olduğunda otomatik
+ * devreye girer.
+ */
 export function primeVoice(): void {
   ensureVoicesLoaded()
+  void primePiper((p: PiperProgress) => {
+    // İleride bir "ses hazırlanıyor %X" göstergesi eklemek istersen
+    // buradaki callback'i kullanabilirsin. Şimdilik sessiz.
+    void p
+  })
+}
+
+/** Şu an hangi motorun konuştuğunu/konuşacağını dışa açar (UI için opsiyonel). */
+export function currentVoiceEngine(): 'piper' | 'browser' {
+  return isPiperReady() ? 'piper' : 'browser'
 }
 
 export function stopSpeaking(): void {
+  // Her iki motoru da temizle — hangisi aktifse onu keser, diğeri zaten boştur.
   speakQueue = []
   queueActive = false
   if (pauseTimer !== null) {
@@ -138,13 +155,14 @@ export function stopSpeaking(): void {
     pauseTimer = null
   }
   if (isSupported()) window.speechSynthesis.cancel()
+  stopPiper()
 }
 
 // ------------------------------------------------------------
-// Doğal duraklamalı, kuyruk tabanlı konuşma motoru
+// Tarayıcı motoru: doğal duraklamalı, kuyruk tabanlı konuşma
+// (Piper hazır olana kadar veya Piper kullanılamazsa devrede)
 // ------------------------------------------------------------
 
-/** rate/pitch'e küçük, insansı bir rastgelelik ekler. */
 function jitterOpts(opts: SpeakOptions): SpeakOptions {
   const jitter = () => (Math.random() * 2 - 1) * 0.03 // ±%3
   const rate = Math.max(0.6, (opts.rate ?? 1) + jitter())
@@ -152,12 +170,6 @@ function jitterOpts(opts: SpeakOptions): SpeakOptions {
   return { rate, pitch }
 }
 
-/**
- * Metni noktalama işaretlerine göre cümleciklere böler ve her cümlecik
- * için "sonrasında ne kadar beklensin" değerini hesaplar. Nokta/ünlem/
- * soru işareti sonrası daha uzun (yeni bir düşünce/nefes), virgül/noktalı
- * virgül sonrası daha kısa bir duraklama uygulanır.
- */
 function splitIntoClauses(text: string): { text: string; pauseAfter: number }[] {
   const rawChunks = text.match(/[^,;:.!?]+[,;:.!?]*/g) ?? [text]
   const chunks = rawChunks.map((c) => c.trim()).filter(Boolean)
@@ -167,14 +179,14 @@ function splitIntoClauses(text: string): { text: string; pauseAfter: number }[] 
     if (isLast) return { text: chunk, pauseAfter: 0 }
     const endsSentence = /[.!?]\s*$/.test(chunk)
     const endsClause = /[,;:]\s*$/.test(chunk)
-    let pauseAfter = 40 // kelimeler arası minik nefes
+    let pauseAfter = 40
     if (endsSentence) pauseAfter = 260 + Math.random() * 160
     else if (endsClause) pauseAfter = 110 + Math.random() * 90
     return { text: chunk, pauseAfter }
   })
 }
 
-function runQueue(): void {
+function runBrowserQueue(): void {
   if (queueActive || !isSupported() || !isVoiceEnabled()) return
   const next = speakQueue.shift()
   if (!next) return
@@ -193,10 +205,10 @@ function runQueue(): void {
     if (next.pauseAfter > 0) {
       pauseTimer = setTimeout(() => {
         pauseTimer = null
-        runQueue()
+        runBrowserQueue()
       }, next.pauseAfter)
     } else {
-      runQueue()
+      runBrowserQueue()
     }
   }
   utter.onend = advance
@@ -205,11 +217,6 @@ function runQueue(): void {
   window.speechSynthesis.speak(utter)
 }
 
-/**
- * Metni doğal duraklamalarla kuyruğa ekler. `leadingPause`, bu metinden
- * önce (kuyrukta o an bekleyen son parçadan sonra) ekstra bir "nefes"
- * boşluğu bırakmak için kullanılır — örn. bir şıktan diğerine geçerken.
- */
 function enqueueClauses(text: string, baseOpts: SpeakOptions, leadingPause = 0): void {
   if (!isVoiceEnabled() || !text) return
   if (leadingPause > 0 && speakQueue.length > 0) {
@@ -220,22 +227,9 @@ function enqueueClauses(text: string, baseOpts: SpeakOptions, leadingPause = 0):
   clauses.forEach((c) => {
     speakQueue.push({ text: c.text, opts: jitterOpts(baseOpts), pauseAfter: c.pauseAfter })
   })
-  runQueue()
+  runBrowserQueue()
 }
 
-/** Kuyruğu temizler, ardından yeni metni doğal duraklamalarla okur. */
-function interruptAndSpeak(text: string, opts: SpeakOptions = {}, extraPause = 0): void {
-  stopSpeaking()
-  enqueueClauses(text, opts)
-  if (extraPause > 0 && speakQueue.length > 0) {
-    speakQueue[speakQueue.length - 1].pauseAfter = Math.max(
-      speakQueue[speakQueue.length - 1].pauseAfter,
-      extraPause
-    )
-  }
-}
-
-/** Aynı kategoriden art arda aynı cümlenin seçilmesini engeller. */
 const lastPickIndex = new WeakMap<object, number>()
 function pick<T>(arr: T[]): T {
   if (arr.length === 1) return arr[0]
@@ -244,6 +238,20 @@ function pick<T>(arr: T[]): T {
   if (idx === last) idx = (idx + 1) % arr.length
   lastPickIndex.set(arr as unknown as object, idx)
   return arr[idx]
+}
+
+/**
+ * Bir metni "aktif motora" gönderir: Piper hazırsa Piper'a, değilse
+ * tarayıcı kuyruğuna. Her iki durumda da aynı imza kullanılır, üst
+ * seviye announce* fonksiyonları hangi motorun aktif olduğunu bilmek
+ * zorunda kalmaz.
+ */
+function speakUnit(text: string, opts: SpeakOptions, leadingPause = 0): void {
+  if (isPiperReady()) {
+    enqueuePiper(text, opts.rate ?? 1, leadingPause)
+  } else {
+    enqueueClauses(text, opts, leadingPause)
+  }
 }
 
 // ============================================================
@@ -256,11 +264,11 @@ const OPTION_LETTERS_TR = ['A', 'B', 'C', 'D']
 export function announceQuestion(questionText: string, options: string[]): void {
   if (!isVoiceEnabled()) return
   stopSpeaking()
-  enqueueClauses(questionText, { rate: 0.98 })
+  speakUnit(questionText, { rate: 0.98 })
   options.forEach((opt, i) => {
     // Her şıktan önce küçük bir "beat" bırak — art arda makine gibi
-    // sıralanmasın, sanki spiker sırayla okuyup düşünüyormuş gibi hissettirsin.
-    enqueueClauses(`${OPTION_LETTERS_TR[i]} şıkkı: ${opt}`, { rate: 1.02 }, 320 + Math.random() * 160)
+    // sıralanmasın, spiker sırayla okuyup düşünüyormuş gibi hissettirsin.
+    speakUnit(`${OPTION_LETTERS_TR[i]} şıkkı: ${opt}`, { rate: 1.02 }, 320 + Math.random() * 160)
   })
 }
 
@@ -282,8 +290,13 @@ const URGENT_5 = [
  * ve rahatsız edici olur.
  */
 export function announceUrgent(secondsLeft: number): void {
-  if (secondsLeft === 10) interruptAndSpeak(pick(URGENT_10), { rate: 1.05, pitch: 1.05 })
-  else if (secondsLeft === 5) interruptAndSpeak(pick(URGENT_5), { rate: 1.15, pitch: 1.15 })
+  if (secondsLeft === 10) {
+    stopSpeaking()
+    speakUnit(pick(URGENT_10), { rate: 1.05, pitch: 1.05 })
+  } else if (secondsLeft === 5) {
+    stopSpeaking()
+    speakUnit(pick(URGENT_5), { rate: 1.15, pitch: 1.15 })
+  }
 }
 
 const CORRECT_BASE = [
@@ -308,7 +321,8 @@ export function announceCorrect(streak: number, points: number): void {
   if (streak >= 6) phrase = pick(CORRECT_STREAK_HIGH)
   else if (streak >= 3) phrase = pick(CORRECT_STREAK_3)
   else phrase = pick(CORRECT_BASE)
-  interruptAndSpeak(`${phrase} ${points} puan kazandın.`, { rate: 1.05, pitch: 1.1 })
+  stopSpeaking()
+  speakUnit(`${phrase} ${points} puan kazandın.`, { rate: 1.05, pitch: 1.1 })
 }
 
 const WRONG_PHRASES = [
@@ -327,15 +341,15 @@ const TIMEOUT_PHRASES = [
 /** Yanlış cevap: üzülür, kısa bir nefes bırakır, sonra doğru cevabı söyler. */
 export function announceWrong(correctAnswerText: string): void {
   stopSpeaking()
-  enqueueClauses(pick(WRONG_PHRASES), { rate: 0.97, pitch: 0.92 })
-  enqueueClauses(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.92 }, 260 + Math.random() * 140)
+  speakUnit(pick(WRONG_PHRASES), { rate: 0.97, pitch: 0.92 })
+  speakUnit(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.92 }, 260 + Math.random() * 140)
 }
 
 /** Süre doldu: yanlıştan farklı bir tonda üzülür, sonra doğru cevabı söyler. */
 export function announceTimeout(correctAnswerText: string): void {
   stopSpeaking()
-  enqueueClauses(pick(TIMEOUT_PHRASES), { rate: 0.97, pitch: 0.9 })
-  enqueueClauses(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.9 }, 260 + Math.random() * 140)
+  speakUnit(pick(TIMEOUT_PHRASES), { rate: 0.97, pitch: 0.9 })
+  speakUnit(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.9 }, 260 + Math.random() * 140)
 }
 
 const END_HIGH = [
@@ -358,7 +372,7 @@ export function announceGameEnd(points: number, questionsAnswered: number): void
   else if (points >= 100 || questionsAnswered >= 4) phrase = pick(END_MID)
   else phrase = pick(END_LOW)
   stopSpeaking()
-  enqueueClauses('Oyun bitti.', { rate: 1 })
-  enqueueClauses(phrase, { rate: 1 }, 180 + Math.random() * 100)
-  enqueueClauses(`Toplam ${points} puan topladın.`, { rate: 1 }, 220 + Math.random() * 120)
+  speakUnit('Oyun bitti.', { rate: 1 })
+  speakUnit(phrase, { rate: 1 }, 180 + Math.random() * 100)
+  speakUnit(`Toplam ${points} puan topladın.`, { rate: 1 }, 220 + Math.random() * 120)
 }
