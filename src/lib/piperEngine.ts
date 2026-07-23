@@ -31,11 +31,20 @@ try {
 }
 
 /**
- * Türkçe için Piper'ın resmi "medium" kalite sesleri: fahrettin, fettah,
- * dfki. fahrettin genel olarak en doğal/dengeli bulunan sestir; istersen
- * bu sabiti değiştirerek diğerlerini deneyebilirsin.
+ * Türkçe için Piper'ın resmi "medium" kalite sesi: dfki.
+ *
+ * ÖNEMLİ: Daha önce burada `tr_TR-fahrettin-medium` kullanılıyordu, ancak
+ * bu ses (ve `fettah`) Hugging Face'teki rhasspy/piper-voices deposunun
+ * `main` dalından katkıcıların talebiyle kaldırıldı. Paket modelleri hep
+ * `.../resolve/main/...` üzerinden indirdiği için bu isimle indirme her
+ * seferinde 404 ile başarısız oluyor, `primePiper()` sürekli `false`
+ * dönüyor ve oyun sessizce tarayıcının SpeechSynthesis motoruna düşüyordu
+ * — yani Piper hiçbir zaman gerçekten devreye giremiyordu.
+ *
+ * `dfki`, main dalında hâlâ mevcut olan tek tr_TR sesi olduğu için
+ * güvenilir çalışması için bu değere sabitlendi.
  */
-export const PIPER_VOICE_ID = 'tr_TR-fahrettin-medium'
+export const PIPER_VOICE_ID = 'tr_TR-dfki-medium'
 
 export type PiperProgress = { url: string; loaded: number; total: number }
 
