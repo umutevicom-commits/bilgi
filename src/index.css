@@ -7,19 +7,65 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    /* Mobilde dokunma sonrası kalan mavi/gri "iz" highlight'ını kaldırır;
+       gerçek buton geri bildirimi kendi hover/active/whileTap stilleriyle verilir. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    color-scheme: dark;
+    height: 100%;
+    /* iOS/Android'de adres çubuğu genişleyip daralırken 100vh zıplamasını önler */
+    height: 100dvh;
   }
 
   body {
     font-family: 'Inter', system-ui, sans-serif;
     background: linear-gradient(135deg, #070d1c 0%, #0a1428 50%, #0f1f3a 100%);
+    background-attachment: fixed;
     color: #eef2f7;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* iOS'ta sayfa kenarına gelindiğinde "lastik bandı" kaymasını sınırlar */
+    overscroll-behavior-y: contain;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+
+  img, svg, video, canvas {
+    max-width: 100%;
+    display: block;
+  }
+
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  /* Fare ile tıklamada değil, yalnızca klavye ile gezinirken görünür odak halkası.
+     Böylece bir seçeneğe dokunduktan/tıkladıktan sonra ekranda kalıcı bir
+     "seçili görünüm izi" kalmaz, ama erişilebilirlik için klavye odağı korunur. */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid #4d7aa8;
+    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
@@ -38,6 +84,20 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: #4d7aa8;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a5a8e #0a1428;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -270,5 +330,23 @@
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Tailwind'in min-h-screen (100vh) sınıfını, mobil tarayıcılarda adres
+     çubuğunun görünür/gizli olma durumuna göre doğru yükseklik veren
+     100dvh ile günceller. Desteklenmeyen tarayıcılarda 100vh'a düşer. */
+  @supports (height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
+  }
+
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }

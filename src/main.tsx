@@ -10,6 +10,17 @@ const basename = import.meta.env.BASE_URL
 
 const rootEl = document.getElementById('root')!
 
+// Offline/PWA desteği: service worker'ı yalnızca prod build'de ve tarayıcı
+// destekliyorsa kaydet. Bu, mevcut oyun/Supabase mantığını hiçbir şekilde
+// etkilemez; sadece statik varlıkları önbelleğe alıp offline erişim sağlar.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(`${basename}sw.js`, { scope: basename })
+      .catch((err) => console.error('Service worker kaydı başarısız:', err))
+  })
+}
+
 // Supabase ortam değişkenleri (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
 // build sırasında tanımlı değilse, uygulamayı çökertmek yerine
 // kullanıcıya net bir uyarı gösteriyoruz. Bu durum genelde GitHub
