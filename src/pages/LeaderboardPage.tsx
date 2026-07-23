@@ -143,7 +143,7 @@ export default function LeaderboardPage() {
     if (entry.gender === 'female') {
       return <span className="badge-queen text-xs">Kraliçe</span>
     }
-    return <span className="badge-king text-xs">Kral</span>
+    return <span className="badge-king text-xs">Üye</span>
   }
 
   const getStars = (points: number) => {
