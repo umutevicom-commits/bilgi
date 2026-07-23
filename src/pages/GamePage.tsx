@@ -33,7 +33,7 @@ export default function GamePage() {
   const {
     session, question, timeLeft, selectedAnswer, showResult, isCorrect,
     loading, error, streak, eliminatedOptions, audienceHint,
-    currentDifficulty, nextQuestion, answerQuestion, takeBreak, endGame,
+    currentDifficulty, startNewGame, nextQuestion, answerQuestion, takeBreak, endGame,
     useFiftyFifty, useAudience, usePhone, QUESTION_TIME,
   } = engine
 
@@ -146,9 +146,14 @@ export default function GamePage() {
         <div className="glass-card p-8 text-center max-w-md">
           <AlertCircle size={48} className="text-error-400 mx-auto mb-4" />
           <p className="text-cream-100 mb-4">{error}</p>
-          <button onClick={() => navigate('/')} className="btn-primary">
-            Ana Sayfaya Dön
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={() => startNewGame()} className="btn-primary">
+              Tekrar Dene
+            </button>
+            <button onClick={() => navigate('/')} className="btn-primary">
+              Ana Sayfaya Dön
+            </button>
+          </div>
         </div>
       </div>
     )
