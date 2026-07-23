@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { loadQuestions, pickRandomQuestion } from '../lib/questions'
+import { loadSeenQuestions, markQuestionSeen } from '../lib/seenQuestions'
 import type { Question, GameSession, DifficultyLevel } from '../types'
 import { DIFFICULTY_ORDER, DIFFICULTY_POINTS } from '../types'
 
@@ -74,15 +75,21 @@ export function useGameEngine(category: string) {
       if (error) throw error
 
       setSession(data as GameSession)
-      setUsedQuestions(new Set())
+      // Yeni oyun başlarken "görülenler" listesini SIFIRLAMIYORUZ — bu
+      // kullanıcının bu tarayıcıda daha önce gördüğü tüm soruları içerir,
+      // böylece bir soru bir kez çıktıysa bir daha çıkmaz.
+      const seen = loadSeenQuestions(user.id)
+      setUsedQuestions(seen)
       setStreak(0)
 
       const diff = currentDifficulty(0)
-      const q = getQuestion(diff, category, new Set())
+      const q = getQuestion(diff, category, seen)
       if (!q) {
         setError('Soru havuzu yükleniyor. Lütfen birkaç saniye sonra tekrar deneyin.')
         return
       }
+      markQuestionSeen(user.id, q.id)
+      setUsedQuestions((prev) => new Set(prev).add(q.id))
       setQuestion(q)
       setTimeLeft(QUESTION_TIME)
       setSelectedAnswer(null)
@@ -102,13 +109,18 @@ export function useGameEngine(category: string) {
     setSession(existingSession)
     setStreak(0)
 
+    const seen = loadSeenQuestions(user?.id ?? null)
+    setUsedQuestions(seen)
+
     const diff = currentDifficulty(existingSession.difficulty_index)
-    const q = getQuestion(diff, existingSession.category, new Set())
+    const q = getQuestion(diff, existingSession.category, seen)
     if (!q) {
       setError('Soru havuzu yükleniyor. Lütfen birkaç saniye sonra tekrar deneyin.')
       setLoading(false)
       return
     }
+    if (user) markQuestionSeen(user.id, q.id)
+    setUsedQuestions((prev) => new Set(prev).add(q.id))
     setQuestion(q)
     setTimeLeft(QUESTION_TIME)
     setSelectedAnswer(null)
@@ -116,7 +128,7 @@ export function useGameEngine(category: string) {
     setEliminatedOptions([])
     setAudienceHint(null)
     setLoading(false)
-  }, [getQuestion])
+  }, [getQuestion, user])
 
   const nextQuestion = useCallback(async () => {
     if (!session || !user) return
@@ -135,6 +147,8 @@ export function useGameEngine(category: string) {
       return
     }
 
+    markQuestionSeen(user.id, q.id)
+    setUsedQuestions((prev) => new Set(prev).add(q.id))
     const { error: updateError } = await supabase
       .from('game_sessions')
       .update({
