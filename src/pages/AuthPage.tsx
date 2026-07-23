@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabase'
 import { Eye, EyeOff, Mail, Lock, User, Upload, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset'
@@ -56,21 +55,6 @@ export default function AuthPage() {
     }
   }
 
-  const uploadAvatar = async (userId: string): Promise<string | null> => {
-    if (!avatarFile) return null
-    const ext = avatarFile.name.split('.').pop()
-    const path = `${userId}/avatar.${ext}`
-    const { error } = await supabase.storage
-      .from('avatars')
-      .upload(path, avatarFile, { upsert: true })
-    if (error) {
-      console.error('Avatar upload error:', error)
-      return null
-    }
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-    return data.publicUrl
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -96,7 +80,7 @@ export default function AuthPage() {
           setLoading(false)
           return
         }
-        const { error } = await signUp(email, password, username)
+        const { error } = await signUp(email, password, username, avatarFile)
         if (error) {
           setError(error)
         } else {

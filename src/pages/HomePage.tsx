@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
@@ -8,7 +8,7 @@ import type { GameSession, Category } from '../types'
 import {
   Play, Trophy, LogOut, LogIn, User, Crown, Star, Zap, BookOpen, Globe,
   Calculator, Newspaper, Car, Map, FlaskConical, Landmark, GraduationCap, Shuffle,
-  Shield,
+  Shield, Camera, Loader2,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -27,13 +27,61 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, updateProfile } = useAuth()
   const isGuest = !user
   const [hasBreakSession, setHasBreakSession] = useState(false)
   const [breakSession, setBreakSession] = useState<GameSession | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showCategorySelect, setShowCategorySelect] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarClick = () => {
+    if (isGuest || avatarUploading) return
+    avatarInputRef.current?.click()
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // aynı dosyayı tekrar seçebilmek için input'u sıfırla
+    if (!file || !user) return
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Lütfen bir resim dosyası seçin.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Resim 5MB\'tan küçük olmalıdır.')
+      return
+    }
+
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${user.id}/avatar.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true })
+      if (uploadError) {
+        console.error('Avatar upload error:', uploadError)
+        setAvatarError('Avatar yüklenemedi. Lütfen tekrar deneyin.')
+        return
+      }
+      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      // Cache'i kırmak için zaman damgası ekliyoruz, böylece eski avatar görünmez kalmaz.
+      const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`
+      const { error: updateError } = await updateProfile({ avatar_url: avatarUrl })
+      if (updateError) {
+        console.error('Profile avatar update error:', updateError)
+        setAvatarError('Avatar kaydedilemedi. Lütfen tekrar deneyin.')
+      }
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   useEffect(() => {
     const checkBreak = async () => {
@@ -123,17 +171,45 @@ export default function HomePage() {
         className="flex items-center justify-between mb-8"
       >
         <div className="flex items-center gap-3">
-          {profile?.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.username}
-              className={`w-12 h-12 rounded-full object-cover ${profile.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}
-            />
-          ) : (
-            <div className={`w-12 h-12 rounded-full bg-primary-700 flex items-center justify-center ${profile?.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}>
-              <User size={24} className="text-primary-200" />
-            </div>
-          )}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleAvatarClick}
+              disabled={isGuest || avatarUploading}
+              className={`relative block rounded-full ${!isGuest ? 'cursor-pointer group' : 'cursor-default'}`}
+              title={!isGuest ? 'Avatarı değiştir' : undefined}
+            >
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.username}
+                  className={`w-12 h-12 rounded-full object-cover ${profile.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}
+                />
+              ) : (
+                <div className={`w-12 h-12 rounded-full bg-primary-700 flex items-center justify-center ${profile?.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}>
+                  <User size={24} className="text-primary-200" />
+                </div>
+              )}
+              {!isGuest && (
+                <div className={`absolute inset-0 rounded-full flex items-center justify-center bg-black/50 transition-opacity ${avatarUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  {avatarUploading ? (
+                    <Loader2 size={16} className="text-cream-100 animate-spin" />
+                  ) : (
+                    <Camera size={16} className="text-cream-100" />
+                  )}
+                </div>
+              )}
+            </button>
+            {!isGuest && (
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+            )}
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-cream-100">{profile?.username || 'Misafir'}</h2>
@@ -176,6 +252,12 @@ export default function HomePage() {
             )}
           </div>
       </motion.header>
+
+      {avatarError && (
+        <div className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm text-center">
+          {avatarError}
+        </div>
+      )}
 
       {/* Title */}
       <motion.div
