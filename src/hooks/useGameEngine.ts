@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { loadQuestions, pickRandomQuestion } from '../lib/questions'
 import type { Question, GameSession, DifficultyLevel } from '../types'
 import { DIFFICULTY_ORDER, DIFFICULTY_POINTS } from '../types'
 
@@ -20,47 +21,29 @@ export function useGameEngine(category: string) {
   const [eliminatedOptions, setEliminatedOptions] = useState<string[]>([])
   const [audienceHint, setAudienceHint] = useState<Record<string, number> | null>(null)
   const [streak, setStreak] = useState(0)
+  const [questionsPool, setQuestionsPool] = useState<Question[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const currentDifficulty = (index: number): DifficultyLevel => {
     return DIFFICULTY_ORDER[index % DIFFICULTY_ORDER.length]
   }
 
-  const fetchQuestion = useCallback(async (difficulty: DifficultyLevel, cat: string, used: Set<string>) => {
-    let query = supabase
-      .from('questions')
-      .select('*')
-      .eq('difficulty', difficulty)
-      .eq('is_active', true)
-
-    if (cat !== 'karisik') {
-      query = query.eq('category', cat)
-    }
-
-    const { data, error } = await query.limit(50)
-
-    if (error) throw error
-
-    const available = (data || []).filter((q) => !used.has(q.id))
-
-    if (available.length === 0) {
-      if (data && data.length > 0) {
-        return data[Math.floor(Math.random() * data.length)] as Question
-      }
-      const { data: anyData, error: anyError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('is_active', true)
-        .limit(50)
-      if (anyError) throw anyError
-      if (anyData && anyData.length > 0) {
-        return anyData[Math.floor(Math.random() * anyData.length)] as Question
-      }
-      return null
-    }
-
-    return available[Math.floor(Math.random() * available.length)] as Question
+  // Soru havuzunu JSON'dan yükle
+  useEffect(() => {
+    let cancelled = false
+    loadQuestions().then((qs) => {
+      if (!cancelled) setQuestionsPool(qs)
+    })
+    return () => { cancelled = true }
   }, [])
+
+  const getQuestion = useCallback(
+    (difficulty: DifficultyLevel, cat: string, used: Set<string>): Question | null => {
+      if (questionsPool.length === 0) return null
+      return pickRandomQuestion(questionsPool, difficulty, cat, used)
+    },
+    [questionsPool]
+  )
 
   const startNewGame = useCallback(async () => {
     if (!user) return
@@ -89,19 +72,23 @@ export function useGameEngine(category: string) {
       setStreak(0)
 
       const diff = currentDifficulty(0)
-      const q = await fetchQuestion(diff, category, new Set())
+      const q = getQuestion(diff, category, new Set())
+      if (!q) {
+        setError('Soru havuzu yükleniyor. Lütfen birkaç saniye sonra tekrar deneyin.')
+        return
+      }
       setQuestion(q)
       setTimeLeft(QUESTION_TIME)
       setSelectedAnswer(null)
       setShowResult(false)
       setEliminatedOptions([])
       setAudienceHint(null)
-    } catch (err) {
+    } catch {
       setError('Oyun başlatılamadı. Lütfen tekrar deneyin.')
     } finally {
       setLoading(false)
     }
-  }, [user, category, fetchQuestion])
+  }, [user, category, getQuestion])
 
   const resumeGame = useCallback(async (existingSession: GameSession) => {
     setLoading(true)
@@ -110,7 +97,12 @@ export function useGameEngine(category: string) {
     setStreak(0)
 
     const diff = currentDifficulty(existingSession.difficulty_index)
-    const q = await fetchQuestion(diff, existingSession.category, new Set())
+    const q = getQuestion(diff, existingSession.category, new Set())
+    if (!q) {
+      setError('Soru havuzu yükleniyor. Lütfen birkaç saniye sonra tekrar deneyin.')
+      setLoading(false)
+      return
+    }
     setQuestion(q)
     setTimeLeft(QUESTION_TIME)
     setSelectedAnswer(null)
@@ -118,23 +110,24 @@ export function useGameEngine(category: string) {
     setEliminatedOptions([])
     setAudienceHint(null)
     setLoading(false)
-  }, [fetchQuestion])
+  }, [getQuestion])
 
   const nextQuestion = useCallback(async () => {
     if (!session || !user) return
 
     const newIndex = session.difficulty_index + 1
     const diff = currentDifficulty(newIndex)
-    const q = await fetchQuestion(diff, session.category, usedQuestions)
+
+    const newUsed = new Set(usedQuestions)
+    if (question) newUsed.add(question.id)
+    setUsedQuestions(newUsed)
+
+    const q = getQuestion(diff, session.category, newUsed)
 
     if (!q) {
       setError('Soru bulunamadı. Lütfen tekrar deneyin.')
       return
     }
-
-    const newUsed = new Set(usedQuestions)
-    if (question) newUsed.add(question.id)
-    setUsedQuestions(newUsed)
 
     const { error: updateError } = await supabase
       .from('game_sessions')
@@ -159,7 +152,7 @@ export function useGameEngine(category: string) {
     setShowResult(false)
     setEliminatedOptions([])
     setAudienceHint(null)
-  }, [session, user, usedQuestions, question, fetchQuestion])
+  }, [session, user, usedQuestions, question, getQuestion])
 
   const answerQuestion = useCallback(async (answer: string) => {
     if (!question || !session || !user || showResult) return
