@@ -2,20 +2,32 @@
  * Tarayıcı yerleşik SpeechSynthesis (Web Speech API) tabanlı Türkçe sesli
  * anlatıcı ("spiker").
  *
- * NEDEN VibeVoice DEĞİL:
+ * NEDEN VibeVoice / Kokoro DEĞİL:
  * microsoft/VibeVoice, Python + PyTorch + GPU gerektiren, "podcast tarzı"
  * uzun-form ses üretimi için tasarlanmış ağır bir araştırma modelidir.
- * Bu proje statik bir React/Vite uygulaması olarak GitHub Pages üzerinde
- * çalışıyor — arkasında sunucu/GPU yok. VibeVoice'u kullanmak, oyunun her
- * "soru okundu / süre azaldı / doğru bildin" anında ayrı bir sunucuya istek
- * atıp saniyeler süren bir model çalıştırmak anlamına gelirdi; bu da hem
- * maliyetli hem de bir yarışma oyunu için gereğinden yavaş olurdu. Ayrıca
- * VibeVoice'un Türkçe desteği resmi olarak garanti edilmiyor.
+ * hexgrad/Kokoro-82M ise tarayıcıda (ONNX/WASM) sunucusuz çalışabilse de
+ * resmi olarak Türkçe desteklemiyor — G2P ve eğitim verisi zayıf/yok, ilk
+ * yüklemede onlarca-yüzlerce MB model indirmesi gerekiyor. Bu proje statik
+ * bir React/Vite uygulaması olarak GitHub Pages üzerinde çalışıyor —
+ * arkasında sunucu/GPU yok ve spiker illa Türkçe konuşmalı. Bu yüzden her
+ * ikisi de bu proje için uygun değil.
  *
- * Bunun yerine tarayıcının kendi `speechSynthesis` motorunu kullanıyoruz:
- * - Ek sunucu/GPU gerektirmez, tamamen ücretsizdir
- * - Modern tarayıcılarda (Chrome, Edge, Safari) tr-TR sesi hazır gelir
- * - Gecikmesi neredeyse sıfırdır (oyunun akışını bozmaz)
+ * Bunun yerine tarayıcının kendi `speechSynthesis` motorunu kullanıyoruz,
+ * ama "düz metni tek seferde oku" yaklaşımından daha fazlasını yapıyoruz:
+ * - En kaliteli tr-TR sesini otomatik seçiyoruz (Natural/Online/Neural
+ *   etiketli sesler varsa onları, yoksa en iyi eşleşeni)
+ * - Cümleyi noktalama işaretlerine göre parçalara bölüp aralarına küçük,
+ *   rastgele "nefes" boşlukları koyuyoruz (nokta sonrası daha uzun,
+ *   virgül sonrası daha kısa duraklama)
+ * - Her cümlecikte hız/perdeyi hafifçe (±%3) rastgele oynatarak art arda
+ *   birebir aynı tonlamayı tekrar etmesini engelliyoruz
+ * - Aynı kategori içinde art arda aynı cümlenin seçilmesini engelliyoruz
+ * - Tüm konuşmalar tek bir kuyruktan akıyor; "kes ve yenisini söyle"
+ *   anlarında (yanlış cevap, süre uyarısı vb.) kuyruk temiz şekilde
+ *   sıfırlanıyor, üst üste binme olmuyor
+ *
+ * Ek sunucu/GPU gerektirmez, tamamen ücretsizdir, gecikmesi neredeyse
+ * sıfırdır (oyunun akışını bozmaz).
  */
 
 type SpeakOptions = {
@@ -23,24 +35,55 @@ type SpeakOptions = {
   pitch?: number
 }
 
+type QueueItem = {
+  text: string
+  opts: SpeakOptions
+  /** Bu cümlecik bittikten sonra bir sonrakine geçmeden önce beklenecek ms */
+  pauseAfter: number
+}
+
 const STORAGE_KEY = 'voice_announcer_enabled'
 
 let cachedVoice: SpeechSynthesisVoice | null = null
 let voicesReady = false
 
+let speakQueue: QueueItem[] = []
+let queueActive = false
+let pauseTimer: ReturnType<typeof setTimeout> | null = null
+
 function isSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window
+}
+
+/**
+ * Bir tr sesine "ne kadar kaliteli/doğal" olabileceğine dair kaba bir puan
+ * verir. Tarayıcılar genelde birden fazla tr sesi sunar (örn. düşük
+ * kaliteli yerel eSpeak sesi + yüksek kaliteli bulut tabanlı "Natural"
+ * sesi); mümkün olan en iyisini otomatik seçmeye çalışıyoruz.
+ */
+function scoreVoice(v: SpeechSynthesisVoice): number {
+  const name = v.name.toLowerCase()
+  const lang = v.lang?.toLowerCase() ?? ''
+  let score = 0
+  if (lang === 'tr-tr') score += 10
+  else if (lang.startsWith('tr')) score += 5
+  if (name.includes('natural')) score += 8
+  if (name.includes('neural')) score += 7
+  if (name.includes('online')) score += 4
+  if (name.includes('google')) score += 5
+  if (name.includes('microsoft')) score += 3
+  if (name.includes('premium') || name.includes('enhanced')) score += 3
+  if (name.includes('compact') || name.includes('espeak') || name.includes('lite')) score -= 6
+  return score
 }
 
 function pickTurkishVoice(): SpeechSynthesisVoice | null {
   if (!isSupported()) return null
   const voices = window.speechSynthesis.getVoices()
   if (voices.length === 0) return null
-  return (
-    voices.find((v) => v.lang?.toLowerCase() === 'tr-tr') ||
-    voices.find((v) => v.lang?.toLowerCase().startsWith('tr')) ||
-    null
-  )
+  const trVoices = voices.filter((v) => v.lang?.toLowerCase().startsWith('tr'))
+  if (trVoices.length === 0) return null
+  return trVoices.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0]
 }
 
 /**
@@ -88,29 +131,119 @@ export function primeVoice(): void {
 }
 
 export function stopSpeaking(): void {
+  speakQueue = []
+  queueActive = false
+  if (pauseTimer !== null) {
+    clearTimeout(pauseTimer)
+    pauseTimer = null
+  }
   if (isSupported()) window.speechSynthesis.cancel()
 }
 
-function speak(text: string, opts: SpeakOptions = {}): void {
-  if (!isSupported() || !isVoiceEnabled() || !text) return
+// ------------------------------------------------------------
+// Doğal duraklamalı, kuyruk tabanlı konuşma motoru
+// ------------------------------------------------------------
+
+/** rate/pitch'e küçük, insansı bir rastgelelik ekler. */
+function jitterOpts(opts: SpeakOptions): SpeakOptions {
+  const jitter = () => (Math.random() * 2 - 1) * 0.03 // ±%3
+  const rate = Math.max(0.6, (opts.rate ?? 1) + jitter())
+  const pitch = Math.max(0.5, Math.min(2, (opts.pitch ?? 1) + jitter()))
+  return { rate, pitch }
+}
+
+/**
+ * Metni noktalama işaretlerine göre cümleciklere böler ve her cümlecik
+ * için "sonrasında ne kadar beklensin" değerini hesaplar. Nokta/ünlem/
+ * soru işareti sonrası daha uzun (yeni bir düşünce/nefes), virgül/noktalı
+ * virgül sonrası daha kısa bir duraklama uygulanır.
+ */
+function splitIntoClauses(text: string): { text: string; pauseAfter: number }[] {
+  const rawChunks = text.match(/[^,;:.!?]+[,;:.!?]*/g) ?? [text]
+  const chunks = rawChunks.map((c) => c.trim()).filter(Boolean)
+
+  return chunks.map((chunk, i) => {
+    const isLast = i === chunks.length - 1
+    if (isLast) return { text: chunk, pauseAfter: 0 }
+    const endsSentence = /[.!?]\s*$/.test(chunk)
+    const endsClause = /[,;:]\s*$/.test(chunk)
+    let pauseAfter = 40 // kelimeler arası minik nefes
+    if (endsSentence) pauseAfter = 260 + Math.random() * 160
+    else if (endsClause) pauseAfter = 110 + Math.random() * 90
+    return { text: chunk, pauseAfter }
+  })
+}
+
+function runQueue(): void {
+  if (queueActive || !isSupported() || !isVoiceEnabled()) return
+  const next = speakQueue.shift()
+  if (!next) return
+
+  queueActive = true
   ensureVoicesLoaded()
 
-  const utter = new SpeechSynthesisUtterance(text)
+  const utter = new SpeechSynthesisUtterance(next.text)
   utter.lang = 'tr-TR'
-  utter.rate = opts.rate ?? 1
-  utter.pitch = opts.pitch ?? 1
+  utter.rate = next.opts.rate ?? 1
+  utter.pitch = next.opts.pitch ?? 1
   if (cachedVoice) utter.voice = cachedVoice
+
+  const advance = () => {
+    queueActive = false
+    if (next.pauseAfter > 0) {
+      pauseTimer = setTimeout(() => {
+        pauseTimer = null
+        runQueue()
+      }, next.pauseAfter)
+    } else {
+      runQueue()
+    }
+  }
+  utter.onend = advance
+  utter.onerror = advance
+
   window.speechSynthesis.speak(utter)
 }
 
-/** Önce o ana kadar kuyruktaki/okunan her şeyi keser, sonra yenisini okur. */
-function interruptAndSpeak(text: string, opts: SpeakOptions = {}): void {
-  stopSpeaking()
-  speak(text, opts)
+/**
+ * Metni doğal duraklamalarla kuyruğa ekler. `leadingPause`, bu metinden
+ * önce (kuyrukta o an bekleyen son parçadan sonra) ekstra bir "nefes"
+ * boşluğu bırakmak için kullanılır — örn. bir şıktan diğerine geçerken.
+ */
+function enqueueClauses(text: string, baseOpts: SpeakOptions, leadingPause = 0): void {
+  if (!isVoiceEnabled() || !text) return
+  if (leadingPause > 0 && speakQueue.length > 0) {
+    const tail = speakQueue[speakQueue.length - 1]
+    tail.pauseAfter = Math.max(tail.pauseAfter, leadingPause)
+  }
+  const clauses = splitIntoClauses(text)
+  clauses.forEach((c) => {
+    speakQueue.push({ text: c.text, opts: jitterOpts(baseOpts), pauseAfter: c.pauseAfter })
+  })
+  runQueue()
 }
 
+/** Kuyruğu temizler, ardından yeni metni doğal duraklamalarla okur. */
+function interruptAndSpeak(text: string, opts: SpeakOptions = {}, extraPause = 0): void {
+  stopSpeaking()
+  enqueueClauses(text, opts)
+  if (extraPause > 0 && speakQueue.length > 0) {
+    speakQueue[speakQueue.length - 1].pauseAfter = Math.max(
+      speakQueue[speakQueue.length - 1].pauseAfter,
+      extraPause
+    )
+  }
+}
+
+/** Aynı kategoriden art arda aynı cümlenin seçilmesini engeller. */
+const lastPickIndex = new WeakMap<object, number>()
 function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+  if (arr.length === 1) return arr[0]
+  let idx = Math.floor(Math.random() * arr.length)
+  const last = lastPickIndex.get(arr as unknown as object)
+  if (idx === last) idx = (idx + 1) % arr.length
+  lastPickIndex.set(arr as unknown as object, idx)
+  return arr[idx]
 }
 
 // ============================================================
@@ -123,9 +256,11 @@ const OPTION_LETTERS_TR = ['A', 'B', 'C', 'D']
 export function announceQuestion(questionText: string, options: string[]): void {
   if (!isVoiceEnabled()) return
   stopSpeaking()
-  speak(questionText, { rate: 0.98 })
+  enqueueClauses(questionText, { rate: 0.98 })
   options.forEach((opt, i) => {
-    speak(`${OPTION_LETTERS_TR[i]} şıkkı: ${opt}`, { rate: 1.02 })
+    // Her şıktan önce küçük bir "beat" bırak — art arda makine gibi
+    // sıralanmasın, sanki spiker sırayla okuyup düşünüyormuş gibi hissettirsin.
+    enqueueClauses(`${OPTION_LETTERS_TR[i]} şıkkı: ${opt}`, { rate: 1.02 }, 320 + Math.random() * 160)
   })
 }
 
@@ -189,14 +324,18 @@ const TIMEOUT_PHRASES = [
   'Yetişemedin, ama sorun değil, devam edelim.',
 ]
 
-/** Yanlış cevap: üzülür ve doğru cevabı söyler. */
+/** Yanlış cevap: üzülür, kısa bir nefes bırakır, sonra doğru cevabı söyler. */
 export function announceWrong(correctAnswerText: string): void {
-  interruptAndSpeak(`${pick(WRONG_PHRASES)} Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.92 })
+  stopSpeaking()
+  enqueueClauses(pick(WRONG_PHRASES), { rate: 0.97, pitch: 0.92 })
+  enqueueClauses(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.92 }, 260 + Math.random() * 140)
 }
 
-/** Süre doldu: yanlıştan farklı bir tonda üzülür ve doğru cevabı söyler. */
+/** Süre doldu: yanlıştan farklı bir tonda üzülür, sonra doğru cevabı söyler. */
 export function announceTimeout(correctAnswerText: string): void {
-  interruptAndSpeak(`${pick(TIMEOUT_PHRASES)} Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.9 })
+  stopSpeaking()
+  enqueueClauses(pick(TIMEOUT_PHRASES), { rate: 0.97, pitch: 0.9 })
+  enqueueClauses(`Doğru cevap: ${correctAnswerText}`, { rate: 0.97, pitch: 0.9 }, 260 + Math.random() * 140)
 }
 
 const END_HIGH = [
@@ -218,5 +357,8 @@ export function announceGameEnd(points: number, questionsAnswered: number): void
   if (points >= 300 || questionsAnswered >= 8) phrase = pick(END_HIGH)
   else if (points >= 100 || questionsAnswered >= 4) phrase = pick(END_MID)
   else phrase = pick(END_LOW)
-  interruptAndSpeak(`Oyun bitti. ${phrase} Toplam ${points} puan topladın.`, { rate: 1 })
+  stopSpeaking()
+  enqueueClauses('Oyun bitti.', { rate: 1 })
+  enqueueClauses(phrase, { rate: 1 }, 180 + Math.random() * 100)
+  enqueueClauses(`Toplam ${points} puan topladın.`, { rate: 1 }, 220 + Math.random() * 120)
 }
