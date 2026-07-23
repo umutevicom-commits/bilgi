@@ -1,28 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const QUESTIONS_FILE = join(__dirname, '..', 'public', 'data', 'questions.json')
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Supabase credentials missing (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)')
-  process.exit(1)
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-
-const USER_AGENT = 'BilgiYarismasiBot/3.0 (educational quiz generator)'
+const USER_AGENT = 'BilgiYarismasiBot/4.0 (educational quiz generator; contact@example.com)'
 const WIKI_API = 'https://tr.wikipedia.org/api/rest_v1/page/summary/'
 const WIKI_SEARCH_API = 'https://tr.wikipedia.org/w/api.php'
 const WIKI_RANDOM_API = 'https://tr.wikipedia.org/api/rest_v1/page/random/summary'
 
 // ============================================
-// KATEGORİ / KONU HAVUZU (5.000+ Sınırsız, Saf Türkçe ve Yerli Kapsam)
+// KATEGORİ / KONU HAVUZU
 // ============================================
 const CATEGORIES = [
   {
     slug: 'genel-kultur',
     topics: [
-      // 1. Şehirler, İlçeler ve Bölgeler (81 İl ve Önemli İlçeler)
       'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın', 'Balıkesir',
       'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli',
       'Diyarbakır', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari',
@@ -31,292 +25,190 @@ const CATEGORIES = [
       'Niğde', 'Ordu', 'Rize', 'Sakarya', 'Samsun', 'Siirt', 'Sinop', 'Sivas', 'Tekirdağ', 'Tokat',
       'Trabzon', 'Tunceli', 'Şanlıurfa', 'Uşak', 'Van', 'Yozgat', 'Zonguldak', 'Aksaray', 'Bayburt', 'Karaman',
       'Kırıkkale', 'Batman', 'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük', 'Kilis', 'Osmaniye', 'Düzce',
-      'Alanya', 'Tarsus', 'İskenderun', 'Dörtyol', 'Payas', 'Samandağ', 'Kırıkhan', 'Reyhanlı', 'Elbistan', 'Nazilli',
-      'Bandırma', 'İnegöl', 'Alaplı', 'Çorlu', 'Gebze', 'Tarsus', 'Manavgat', 'Bodrum', 'Marmaris', 'Fethiye',
-      
-      // 2. Tarihi Yerler, Antik Kentler ve Ören Yeri (Türkiye Odaklı)
-      'Göbeklitepe', 'Efes Antik Kenti', 'Kapadokya', 'Pamukkale', 'Nemrut Dağı', 'Topkapı Sarayı', 'Ayasofya',
-      'Sultanahmet Camii', 'Sümela Manastırı', 'Safranbolu evleri', 'Cumalıkızık', 'Truva Antik Kenti', 'Hattuşaş',
-      'Hierapolis', 'Pergamon', 'Aspendos', 'Side Antik Kenti', 'Milet Antik Kenti', 'Didyma', 'Priene',
-      'Çatalhöyük', 'Alacahöyük', 'Yerebatan Sarnıcı', 'Dolmabahçe Sarayı', 'İshak Paşa Sarayı', 'Divriği Ulu Cami',
-      'Ani Harabeleri', 'Zeugma Mozaik Müzesi', 'Göreme Açık Hava Müzesi', 'Ihlara Vadisi', 'Uçhisar Kalesi',
-      'Kız Kulesi', 'Galata Kulesi', 'Rumeli Hisarı', 'Anadolu Hisarı', 'Yedikule Hisarları', 'Süleymaniye Camii',
-      'Selimiye Camii', 'Yeşil Cami', 'Eski Cami', 'Muradiye Külliyesi', 'Bursa Ulu Cami', 'Erzurum Çifte Minareli Medrese',
-      'Yakutiye Medresesi', 'Sivas Gök Medrese', 'Karatay Medresesi', 'İnce Minareli Medrese', 'Mevlana Müzesi',
-      
-      // 3. Türk Edebiyatı, Şairler ve Yazarlar
+      'Alanya', 'Tarsus', 'İskenderun', 'Manavgat', 'Bodrum', 'Marmaris', 'Fethiye',
+      'Göbeklitepe', 'Efes', 'Kapadokya', 'Pamukkale', 'Nemrut Dağı', 'Topkapı Sarayı', 'Ayasofya',
+      'Sultanahmet Camii', 'Sümela Manastırı', 'Safranbolu', 'Truva', 'Hattuşaş',
+      'Hierapolis', 'Pergamon', 'Aspendos', 'Side', 'Milet', 'Didyma', 'Priene',
+      'Çatalhöyük', 'Yerebatan Sarnıcı', 'Dolmabahçe Sarayı', 'İshak Paşa Sarayı', 'Divriği Ulu Cami',
+      'Ani', 'Zeugma', 'Göreme', 'Ihlara Vadisi', 'Kız Kulesi', 'Galata Kulesi', 'Rumeli Hisarı',
+      'Süleymaniye Camii', 'Selimiye Camii', 'Mevlana Müzesi',
       'Nazım Hikmet', 'Yaşar Kemal', 'Orhan Pamuk', 'Ahmet Hamdi Tanpınar', 'Sabahattin Ali', 'Halide Edip Adıvar',
-      'Reşat Nuri Güntekin', 'Yahya Kemal Beyatlı', 'Atilla İlhan', 'Cemal Süreya', 'Edip Cansever', 'Turgut Uyar',
-      'İlhan Berk', 'Sezai Karakoç', 'Cahit Zarifoğlu', 'Ahmet Arif', 'Oğuz Atay', 'Buket Uzuner', 'Zülfü Livaneli',
-      'Peyami Safa', 'Yakup Kadri Karaosmanoğlu', 'Refik Halit Karay', 'Memduh Şevket Esendal', 'Sait Faik Abasıyanık',
-      'Tarık Buğra', 'Kemal Tahir', 'Orhan Kemal', 'Fakir Baykurt', 'Dursun Akçam', 'Talip Apaydın',
-      'Samim Kocagöz', 'Aziz Nesin', 'Rıfat Ilgaz', 'Hüseyin Rahmi Gürpınar', 'Namık Kemal', 'Şinasi', 'Ziya Paşa',
-      'Ahmet Vefik Paşa', 'Muallim Naci', 'Recaizade Mahmud Ekrem', 'Abdülhak Hamid Tarhan', 'Tevfik Fikret',
-      'Mehmet Akif Ersoy', 'Ziya Gökalp', 'Ömer Seyfettin', 'Faruk Nafiz Çamlıbel', 'Halit Fahri Ozansoy',
-      'Yusuf Ziya Ortaç', 'Orhan Seyfi Orhon', 'Enis Behiç Koryürek', 'Ahmet Kutsi Tecer', 'Necip Fazıl Kısakürek',
-      'Asaf Halet Çelebi', 'Behçet Necatigil', 'Cahit Sıtkı Tarancı', 'Ahmet Muhip Dıranas', 'Fazıl Hüsnü Dağlarca',
-      'Oktay Rifat', 'Melih Cevdet Anday', 'Atilla İlhan', 'Ümit Yaşar Oğuzcan', 'Cengiz Aytmatov', 'Elif Şafak',
-      'Ahmet Ümit', 'Orhan Kemal', 'Yakup Kadri', 'Halide Edip', 'Refik Halit', 'Memduh Şevket', 'Sait Faik',
-      
-      // 4. Halk Edebiyatı, Ozanlar ve Destanlar
-      'Yunus Emre', 'Mevlana Celaleddin-i Rumi', 'Nasreddin Hoca', 'Dede Korkut', 'Karacaoğlan', 'Köroğlu',
-      'Dadaloğlu', 'Pir Sultan Abdal', 'Seyrani', 'Kaygusuz Abdal', 'Aşık Veysel', 'Neşet Ertaş', 'Mahzuni Şerif',
-      'Abdrahim Karakoç', 'Bedri Rahmi Eyüboğlu', 'Manas Destanı', 'Ergenekon Destanı', 'Türeyiş Destanı',
-      'Göç Destanı', 'Şu Destanı', 'Bozkurt Destanı', 'Ouz Kağan Destanı', 'Köroğlu Destanı', 'Battal Gazi Destanı',
-      'Dede Korkut Hikayeleri', 'Nasreddin Hoca Fıkraları', 'Yunus Emre İlahileri', 'Karacaoğlan Türküleri',
-      
-      // 5. Türk Sanatları, Gelenekler ve Kültür
-      'Ebru sanatı', 'Hat sanatı', 'Tezhip', 'Miniatür', 'Çini sanatı', 'Halı dokumacılığı', 'Bakırcılık',
-      'Oltu taşı', 'Lüle taşı', 'Camaltı sanatları', 'Ahşap oymacılığı', 'Sedekari', 'Keçe yapımı', 'Dokuma sanatları',
-      'Karagöz ve Hacivat', 'Meddah', 'Orta oyunu', 'Halk oyunları', 'Zeybek', 'Horon', 'Halay', 'Bar',
-      'Kafkas', 'Karşılama', 'Kaşık havası', 'Hançer barı', 'Bengü', 'Atabarı', 'Demircilik', 'Nalbantlık',
-      'Ahilik teşkilatı', 'Geleneksel Türk mimarisi', 'Osmanlı konakları', 'Kervansaraylar', 'Hamam kültürü',
-      'Bedestenler', 'Sadırvanlar', 'Türbeler', 'Külliyeler', 'Medreseler', 'Şifahâneler', 'Türk kahvesi',
-      'Türk lokumu', 'Baklava', 'Mantı', 'İskender kebap', 'Döner', 'Lahmacun', 'Künefe', 'Simit', 'Ayran',
-      'Rakı', 'Türk çayı', 'Ney', 'Bağlama', 'Kemençe', 'Zurna', 'Davul', 'Klarnet', 'Kanun', 'Ud', 'Tanbur',
-      'Rebab', 'Kabak kemane', 'Sipsi', 'Cümbüş', 'Mey', 'Kaval', 'Çifte', 'Tulum', 'Zilli maşa', 'Darbuka',
-      
-      // 6. Türk Tarihi ve Siyasi Dönemler
-      'Osmanlı İmparatorluğu', 'Selçuklu Devleti', 'Büyük Selçuklu İmparatorluğu', 'Anadolu Selçuklu Devleti',
-      'Türkiye Cumhuriyeti', 'Mustafa Kemal Atatürk', 'Kurtuluş Savaşı', 'Cumhuriyetin ilanı', 'Büyük Taarruz',
-      'Sakarya Meydan Savaşı', 'Amasya Genelgesi', 'Erzurum Kongresi', 'Sivas Kongresi', 'Misak-ı Millî',
-      'Saltanatın Kaldırılması', 'Halifeliğin Kaldırılması', 'Harf İnkılabı', 'Kıyafet Kanunu', 'Soyadı Kanunu',
-      'Kadınlara Seçme ve Seçilme Hakkı', 'Türk Tarih Kurumu', 'Türk Dil Kurumu', 'Medeni Kanun', 'Kabotaj Kanunu',
-      'Teşviki Sanayi Kanunu', 'Aşar Vergisinin Kaldırılması', 'Osmanlı Kuruluş Dönemi', 'Osmanlı Yükselme Dönemi',
-      'Osmanlı Duraklama Dönemi', 'Osmanlı Gerileme Dönemi', 'Osmanlı Dağılma Dönemi', 'Tanzimat Fermanı',
-      'Islahat Fermanı', 'I. Meşrutiyet', 'II. Meşrutiyet', 'Trablusgarp Savaşı', 'Balkan Savaşları', 'Çanakkale Cephesi',
-      'Kafkas Cephesi', 'Sina ve Filistin Cephesi', 'Barbaros Hayrettin Paşa', 'Turgut Reis', 'Piri Reis',
-      'Sokullu Mehmet Paşa', 'Köprülüler Dönemi', 'Karlofça Antlaşması', 'Küçük Kaynarca Antlaşması', 'Sened-i İttifak',
-      'Kanun-i Esasi', '31 Mart Vakası', 'Osmanlı Padişahları', 'Osmanlı Donanması', 'Yeniçeri Ocağı', 'Devşirme sistemi',
-      'Tımar sistemi', 'Divan-ı Hümayun', 'Kapıkulu ocakları', 'Ahilik sistemi', 'Göktürkler', 'Uygurlar', 'Karahanlılar',
-      'Gazneliler', 'Harzemşahlar', 'İldenizliler', 'Saltuklular', 'Artuklular', 'Dânişmendliler', 'Mengüçlüler',
-      
-      // 7. Türk Sineması, Tiyatro ve Müzik Dünyası (Yeşilçam ve Modern)
-      'Şener Şen', 'Kemal Sunal', 'Adile Naşit', 'Münir Özkul', 'Zeki Alasya', 'Metin Akpınar', 'Türkan Şoray',
-      'Hülya Koçyiğit', 'Filiz Akın', 'Fatma Girik', 'Ayhan Işık', 'Cüneyt Arkın', 'Tarık Akan', 'Nuri Bilge Ceylan',
-      'Yılmaz Erdoğan', 'Cem Yılmaz', 'Şahan Gökbakar', 'Atıf Yılmaz', 'Ertem Eğilmez', 'Muhsin Ertuğrul',
-      'Metin Erksan', 'Yılmaz Güney', 'Ekrem Bora', 'Sadri Alışık', 'Hulusi Kentmen', 'Mürüvvet Sim', 'Vahi Öz',
-      'Necdet Tosun', 'Ferdi Tayfur', 'Müslüm Gürses', 'Orhan Gencebay', 'İbrahim Tatlıses', 'Sezen Aksu',
-      'Tarkan', 'Ajda Pekkan', 'Zeki Müren', 'Müzeyyen Senar', 'Safiye Ayla', 'Dario Moreno', 'Barış Manço',
-      'Cem Karaca', 'Erkin Koray', 'Fikret Kızılok', 'Mazhar Alanson', 'Özkan Uğur', 'Fuat Güner', 'Sertab Erener',
-      'Teoman', 'Şebnem Ferah', 'Mor ve Ötesi', 'Duman', 'Athena', 'Kargo', 'Manga', 'Gripin', 'Yüksek Sadakat'
+      'Reşat Nuri Güntekin', 'Yahya Kemal Beyatlı', 'Atilla İlhan', 'Cemal Süreya', 'Oğuz Atay',
+      'Peyami Safa', 'Sait Faik Abasıyanık', 'Tarık Buğra', 'Kemal Tahir', 'Orhan Kemal', 'Aziz Nesin',
+      'Rıfat Ilgaz', 'Namık Kemal', 'Şinasi', 'Tevfik Fikret', 'Mehmet Akif Ersoy', 'Ziya Gökalp',
+      'Ömer Seyfettin', 'Necip Fazıl Kısakürek', 'Cahit Sıtkı Tarancı', 'Fazıl Hüsnü Dağlarca',
+      'Yunus Emre', 'Mevlana', 'Nasreddin Hoca', 'Dede Korkut', 'Karacaoğlan', 'Köroğlu',
+      'Pir Sultan Abdal', 'Aşık Veysel', 'Neşet Ertaş', 'Mahzuni Şerif',
+      'Ebru', 'Hat sanatı', 'Tezhip', 'Çini', 'Halı', 'Karagöz ve Hacivat', 'Meddah', 'Orta oyunu',
+      'Zeybek', 'Horon', 'Halay', 'Türk kahvesi', 'Baklava', 'Mantı', 'İskender kebap', 'Döner',
+      'Lahmacun', 'Künefe', 'Simit', 'Ayran', 'Ney', 'Bağlama', 'Kemençe', 'Zurna', 'Davul', 'Kanun', 'Ud',
+      'Osmanlı İmparatorluğu', 'Selçuklu Devleti', 'Türkiye Cumhuriyeti', 'Mustafa Kemal Atatürk',
+      'Kurtuluş Savaşı', 'Büyük Taarruz', 'Sakarya Meydan Muharebesi', 'Amasya Genelgesi',
+      'Erzurum Kongresi', 'Sivas Kongresi', 'Misak-ı Millî', 'Halifeliğin Kaldırılması',
+      'Harf Devrimi', 'Soyadı Kanunu', 'Tanzimat Fermanı', 'Islahat Fermanı',
+      'Barbaros Hayrettin Paşa', 'Turgut Reis', 'Piri Reis', 'Sokullu Mehmet Paşa',
+      'Karlofça Antlaşması', 'Küçük Kaynarca Antlaşması', 'Yeniçeri Ocağı', 'Tımar sistemi',
+      'Göktürkler', 'Uygurlar', 'Karahanlılar', 'Gazneliler', 'Harzemşahlar',
+      'Şener Şen', 'Kemal Sunal', 'Adile Naşit', 'Münir Özkul', 'Türkan Şoray',
+      'Cüneyt Arkın', 'Nuri Bilge Ceylan', 'Cem Yılmaz', 'Yılmaz Güney', 'Muhsin Ertuğrul',
+      'İbrahim Tatlıses', 'Sezen Aksu', 'Tarkan', 'Ajda Pekkan', 'Zeki Müren', 'Barış Manço',
+      'Cem Karaca', 'Erkin Koray', 'Sertab Erener',
     ]
   },
   {
     slug: 'matematik',
     topics: [
-      // 1. Temel Aritmetik ve Sayı Sistemleri
-      'Matematik', 'Geometri', 'Cebir', 'Trigonometri', 'İstatistik', 'Olasılık', 'Sayı teorisi', 'Kalkülüs',
-      'Pisagor teoremi', 'Asal sayı', 'Fibonacci dizisi', 'Pi sayısı', 'Küme teorisi', 'Fonksiyon (matematik)',
-      'Logaritma', 'Türev', 'İntegral', 'Matris', 'Determinant', 'Vektör', 'Limit', 'Dizi ve seriler', 'Polinom',
-      'Denklem sistemleri', 'Mutlak değer', 'Oran orantı', 'Yüzde problemleri', 'Kâr zarar problemleri',
-      'Hız problemleri', 'İşçi havuz problemleri', 'Yaş problemleri', 'Grafik okuma', 'Analitik geometri',
-      'Çember ve daire', 'Üçgenler', 'Dörtgenler', 'Çokgenler', 'Katı cisimler', 'Trigonometrik özdeşlikler',
-      'Kombinasyon', 'Permütasyon', 'Binom açılımı', 'Modüler aritmetik', 'EBOB EKOK', 'Bölme bölünebilme',
-      'Rasyonel sayılar', 'Üslü ifadeler', 'Köklü ifadeler', 'Çarpanlara ayırma', 'Birinci dereceden denklemler',
-      'İkinci dereceden denklemler', 'Karmaşık sayılar', 'Trigonometrik denklemler', 'Logaritmik denklemler',
-      'Türev uygulamaları', 'İntegral uygulamaları', 'Alan hesaplama', 'Hacim hesaplama', 'Euler özdeşliği',
-      'Fermat son teoremi', 'Goldbach hipotezi', 'Riemann hipotezi', 'Asal sayı teoremi', 'Pascal üçgeni',
-      'Descartes kartezyen koordinat sistemi', 'Öklid geometrisi', 'Non-Euclidean geometri', 'Topoloji', 'Fraktal',
-      'Kandel çemberi', 'Sonsuzluk kavramı', 'Matematiksel mantık', 'Önermeler', 'Niceleyiciler', 'Kümelerde işlemler',
-      'Kartezyen çarpım', 'Bağıntı', 'Fonksiyon türleri', 'Bire bir fonksiyon', 'Örten fonksiyon', 'Ters fonksiyon',
-      'Bileşke fonksiyon', 'Polinom fonksiyonlar', 'Rasyonel fonksiyonlar', 'Üstel fonksiyonlar', 'Trigonometrik fonksiyonlar',
-      'Ters trigonometrik fonksiyonlar', 'Hiperbolik fonksiyonlar', 'Parametrik denklemler', 'Kutup koordinatları',
-      'Vektörel çarpım', 'Skaler çarpım', 'Doğru denklemi', 'Düzlem denklemi', 'Konikler', 'Çember denklemi',
-      'Elips', 'Hiperbol', 'Parabol', 'Teğet', 'Normal', 'Asimptot', 'Türev tanımı', 'Zincir kuralı', 'L Hospital kuralı',
-      'Belirsiz integraller', 'Belirli integraller', 'Riemann toplamı', 'Banach uzayı', 'Hilbert uzayı',
-      'Kategori teorisi', 'Boolean cebiri', 'Oyun teorisi', 'Çizge teorisi', 'Kalkülüs varyasyonları',
-      'Diferansiyel geometri', 'Diferansiyel denklemler', 'Kısmi türevli diferansiyel denklemler',
-      'Adi diferansiyel denklemler', 'Fourier analizi', 'Laplace dönüşümü', 'Z dönüşümü', 'Kompleks analiz',
-      'Reel analiz', 'Ölçü teorisi', 'Ergodik teori', 'Dinamik sistemler', 'Kaos teorisi', 'Bifürkasyon teorisi',
-      'Stokastik süreçler', 'Brown hareketi', 'Monte Carlo simülasyonu', 'Markov zincirleri', 'Kuyruk teorisi',
-      'Varyans analizi', 'Regresyon analizi', 'Hipotez testleri', 'Parametrik olmayan testler',
-      'Harezmi', 'Ömer Hayyam', 'İbn el-Heysem', 'Biruni', 'Cahit Arf', 'Kerim Erim', 'Salih Murat Uzdilek',
-      'Nazım Terzioğlu', 'Cahit Arf Teoremi', 'Arf Değişmezi', 'Matematik tarihi', 'Geometri tarihi'
+      'Matematik', 'Geometri', 'Cebir', 'Trigonometri', 'İstatistik', 'Olasılık', 'Sayı teorisi',
+      'Pisagor teoremi', 'Asal sayı', 'Fibonacci dizisi', 'Pi sayısı', 'Küme teorisi',
+      'Logaritma', 'Türev', 'İntegral', 'Matris', 'Determinant', 'Vektör', 'Limit',
+      'Polinom', 'Mutlak değer', 'Oran orantı', 'Analitik geometri',
+      'Çember', 'Üçgen', 'Dörtgen', 'Çokgenler', 'Katı cisimler',
+      'Kombinasyon', 'Permütasyon', 'Binom açılımı', 'Modüler aritmetik',
+      'Rasyonel sayılar', 'Üslü ifadeler', 'Köklü ifadeler', 'Çarpanlara ayırma',
+      'İkinci dereceden denklem', 'Karmaşık sayılar',
+      'Euler özdeşliği', 'Fermat son teoremi', 'Pascal üçgeni',
+      'Descartes', 'Öklid geometrisi', 'Topoloji', 'Fraktal',
+      'Matematiksel mantık', 'Fonksiyon', 'Bire bir fonksiyon', 'Ters fonksiyon',
+      'Bileşke fonksiyon', 'Üstel fonksiyon', 'Trigonometrik fonksiyon',
+      'Doğru denklemi', 'Parabol', 'Elips', 'Hiperbol',
+      'Zincir kuralı', 'Belirli integral', 'Fourier analizi', 'Laplace dönüşümü',
+      'Diferansiyel denklem', 'Oyun teorisi', 'Çizge teorisi',
+      'Harezmi', 'Ömer Hayyam', 'Cahit Arf', 'Pisagor', 'Öklid', 'Arşimed',
+      'Newton', 'Leibniz', 'Euler', 'Gauss',
     ]
   },
   {
     slug: 'guncel',
     topics: [
-      // 1. Yerli Teknoloji ve Dijital Dönüşüm (Türkiye Odaklı)
-      'Togg', 'Bayraktar TB2', 'Bayraktar Akıncı', 'Kızılelma', 'Anka', 'Aksungur', 'Atak Helikopteri', 'Gökbey',
-      'Altay Tankı', 'TCG Anadolu', 'MİLGEM', 'İ sınıfı fırkateyn', 'Hisar füze sistemi', 'Siper füze sistemi',
-      'Bora füzesi', 'Atmaca füzesi', 'Tübitak', 'TUSAŞ', 'ROKETSAN', 'ASELSAN', 'HAVELSAN', 'TEI', 'ASPİLSAN',
-      'Bilişim Vadisi', 'Teknopark İstanbul', 'Gaziantep Teknopark', 'İzmir Teknopark', 'Eskişehir Teknopark',
-      'Yerli otomobil', 'Yerli elektrikli araç', 'Yerli uydu', 'Türksat 3A', 'Türksat 4A', 'Türksat 4B', 'Türksat 5A',
-      'Türksat 5B', 'Türksat 6A', 'İmece uydusu', 'Göktürk-1', 'Göktürk-2', 'Borsa İstanbul', 'TCMB', 'Yapay zeka',
-      'Sosyal medya', 'İnternet', 'Uzay teknolojisi', 'Akıllı telefon', 'Elektrikli araç', 'Kripto para', 'Bulut bilişim',
-      'Siber güvenlik', 'Nesnelerin interneti', '5G', '6G teknolojisi', 'Li-Fi', 'Kuantum internet', 'Katı hal bataryaları',
-      'Giyilebilir teknoloji', 'Akıllı saatler', 'Akıllı gözlükler', 'Biyonik uzuvlar', 'Genetik mühendisliği',
-      'Sentetik biyoloji', 'Dikey tarım', 'Yapay et', 'Karbon yakalama', 'Geleceğin ulaşım sistemleri', 'Yörünge turizmi',
-      'Asteroid madenciliği', 'Ay üssü projeleri', 'Yapay zeka ajanı', 'Multimodal yapay zeka', 'Açık kaynak yapay zeka',
-      'Büyük veri analitiği', 'Yapay zeka modelleri', 'Büyük dil modelleri', 'Makine öğrenmesi', 'Derin öğrenme',
-      'Kuantum bilgisayar', 'Artırılmış gerçeklik', 'Sanal gerçeklik', 'Metaverse', 'Otonom sürüş', 'Lityum iyon pil',
-      'Batarya teknolojileri', 'Yenilenebilir enerji', 'Güneş paneli', 'Rüzgar türbini', 'Hidrojen yakıt hücresi',
-      'Nükleer füzyon', 'Biyoteknoloji', 'Gen terapisi', 'CRISPR', 'Nanoteknoloji', '3D yazıcı', '4D yazıcı',
-      'Akıllı şehirler', 'Blokzincir', 'Akıllı sözleşmeler', 'NFT', 'Merkeziyetsiz finans', 'Siber savaş', 'Veri gizliliği',
-      'Kişisel verilerin korunması', 'Dijital dönüşüm', 'E-ticaret', 'Dijital pazarlama', 'Sosyal medya trendleri',
-      'Influencer pazarlaması', 'Podcast', 'Streaming servisleri', 'Siber güvenlik protokolleri', 'Zero Trust',
-      'Ransomware', 'Phishing', 'Deepfake', 'Algoritma etiği', 'Yapay zeka denetimi', 'Teknolojik tekillik'
+      'Togg', 'Bayraktar TB2', 'Bayraktar Akıncı', 'Anka', 'Altay Tankı', 'TCG Anadolu',
+      'MİLGEM', 'Hisar füze sistemi', 'Atmaca füzesi', 'Tübitak', 'TUSAŞ', 'ROKETSAN',
+      'ASELSAN', 'HAVELSAN', 'Türksat 6A', 'İmece uydusu', 'Göktürk-2',
+      'Yapay zeka', 'Sosyal medya', 'İnternet', 'Akıllı telefon', 'Elektrikli araç',
+      'Kripto para', 'Bulut bilişim', 'Siber güvenlik', 'Nesnelerin interneti',
+      '5G', 'Kuantum bilgisayar', 'Artırılmış gerçeklik', 'Sanal gerçeklik',
+      'Otonom sürüş', 'Lityum iyon pil', 'Güneş paneli', 'Rüzgar türbini',
+      'Nükleer füzyon', 'Biyoteknoloji', 'CRISPR', 'Nanoteknoloji', '3D yazıcı',
+      'Blokzincir', 'NFT', 'Derin öğrenme', 'Makine öğrenmesi',
+      'Büyük dil modeli', 'Metaverse', 'Drone', 'Robotik',
     ]
   },
   {
     slug: 'ehliyet',
     topics: [
-      // 1. Karayolları Trafik Kuralları ve Mevzuat (Türkiye)
-      'Trafik kuralları', 'Sürücü belgesi', 'Kara yolları', 'Trafik işaretleri', 'Trafik kazası', 'Emniyet kemeri',
-      'Hız sınırı', 'Trafik ışığı', 'Motorlu taşıt', 'Karayolu Trafik Kanunu', 'İlk yardım', 'Motor bilgisi',
-      'Trafik adabı', 'Araç tekniği', 'Direksiyon sınavı', 'İç kanama', 'Şok pozisyonu', 'Turnike uygulaması',
-      'Suni solunum', 'Kalp masajı', 'Koma pozisyonu', 'Heimlich manevrası', 'Kırık çıkık çıkıklar', 'Yanıklar',
-      'Zehirlenmeler', 'Böcek sokmaları', 'Trafik işaret levhaları', 'Tehlike uyarı işaretleri', 'Trafik tanzim işaretleri',
-      'Bilgi işaretleri', 'Durma duraklama park etme', 'Öncelik hakkı', 'Geçiş üstünlüğü', 'Kavşaklar', 'Dönel kavşak',
-      'Şerit izleme', 'Öncü araç', 'Takip mesafesi', 'Hız sınırları', 'Otoyol kuralları', 'Yerleşim yeri',
-      'Gece sürüşü', 'Sisli hava sürüşü', 'Yağmurlu hava sürüşü', 'Karlı buzlu yollar', 'Akuplaj', 'Fren sistemi',
-      'ABS', 'ASR', 'ESP', 'Hava yastığı', 'Direksiyon sistemi', 'Süspansiyon sistemi', 'Lastik diş derinliği',
-      'Rot ayarı', 'Balans ayarı', 'Motor yağı', 'Antifriz', 'Fren hidroliği', 'Motor soğutma suyu',
-      'Akü kutup başları', 'Alternatör', 'Marş motoru', 'Buji', 'Enjektör', 'Debriyaj', 'Vites kutusu',
-      'Diferansiyel', 'Egzoz emisyon', 'Muayene süreleri', 'Zorunlu trafik sigortası', 'Kasko', 'Ehliyet sınıfları',
-      'M sınıfı', 'A1 sınıfı', 'A2 sınıfı', 'A sınıfı', 'B1 sınıfı', 'B sınıfı', 'BE sınıfı', 'C1 sınıfı',
-      'C sınıfı', 'CE sınıfı', 'D1 sınıfı', 'D sınıfı', 'DE sınıfı', 'F sınıfı', 'G sınıfı', 'Ceza puanı',
-      'Ehliyet iptali', 'Alkollü araç kullanımı', 'Uyuşturucu etkisi', 'Kırmızı ışık ihlali', 'Ters yön',
-      'Hatalı sollama', 'Yaya geçidi önceliği', 'Okul geçidi', 'Engelli park yeri', 'Trafik polisi işaretleri',
-      'Yolcu taşıma kuralları', 'Yük taşıma kuralları', 'Azami yüklü ağırlık', 'Dinamik denge', 'Hidroplaning',
-      'Akü şarj etme', 'Lastik değişimi', 'Sigorta atması', 'Katalitik konvertör', 'Triger kayışı', 'Radyatör bakımı',
-      'Enjektör temizliği', 'Turbo şarj', 'Intercooler', 'Şanzıman yağı', 'Direksiyon kutusu', 'Rot başı',
-      'Aks mafsalı', 'Amortisör', 'Yay salınımı', 'Kampana fren', 'Disk fren', 'El freni ayarı', 'Fren balatası',
-      'Vantilatör kayışı', 'Vakum pompası', 'Motor arıza lambası', 'Yağ basınç lambası', 'Şarj lambası', 'Hararet göstergesi'
+      'Trafik kuralları', 'Sürücü belgesi', 'Trafik işaretleri', 'Emniyet kemeri',
+      'Hız sınırı', 'Trafik ışığı', 'İlk yardım', 'Motor bilgisi',
+      'Trafik kazası', 'Karayolu Trafik Kanunu', 'Kavşaklar', 'Dönel kavşak',
+      'Geçiş üstünlüğü', 'Öncelik hakkı', 'Takip mesafesi', 'Otoyol kuralları',
+      'Fren sistemi', 'ABS', 'Hava yastığı', 'Lastik diş derinliği',
+      'Motor yağı', 'Akü', 'Alternatör', 'Buji', 'Debriyaj', 'Vites kutusu',
+      'Katalitik konvertör', 'Zorunlu trafik sigortası', 'Kasko',
+      'Ehliyet sınıfları', 'Alkollü araç kullanımı', 'Kırmızı ışık ihlali',
+      'Yaya geçidi', 'Okul geçidi', 'Hidroplaning', 'Disk fren', 'Kampana fren',
+      'Turbo şarj', 'Intercooler', 'Rot ayarı', 'Balans ayarı',
     ]
   },
   {
     slug: 'cografya',
     topics: [
-      // 1. Türkiye Coğrafyası (Dağlar, Nehirler, Göller, Bölgeler)
-      'Türkiye coğrafyası', 'Marmara Bölgesi', 'Ege Bölgesi', 'Akdeniz Bölgesi', 'İç Anadolu Bölgesi',
-      'Karadeniz Bölgesi', 'Doğu Anadolu Bölgesi', 'Güneydoğu Anadolu Bölgesi', 'Ağrı Dağı', 'Cilo Dağı',
-      'Süphan Dağı', 'Kaçkar Dağları', 'Uludağ', 'Erciyes Dağı', 'Hasan Dağı', 'Nemrut Dağı', 'Palandöken Dağı',
-      'Kuzey Anadolu Dağları', 'Toros Dağları', 'Kızılırmak', 'Yeşilırmak', 'Sakarya Nehri', 'Aras Nehri',
-      'Kura Nehri', 'Seyhan Nehri', 'Ceyhan Nehri', 'Büyük Menderes', 'Gediz Nehri', 'Fırat Nehri', 'Dicle Nehri',
-      'Van Gölü', 'Tuz Gölü', 'Beyşehir Gölü', 'Eğirdir Gölü', 'Burdur Gölü', 'İznik Gölü', 'Ulubat Gölü',
-      'Sapanca Gölü', 'Çıldır Gölü', 'Acıgöl', 'Akşehir Gölü', 'Eber Gölü', 'Işıklı Gölü', 'Kovada Gölü',
-      'Hazar Gölü', 'Çıldır Gölü', 'Tortum Gölü', 'Abant Gölü', 'Yedigöller', 'Sapanca Gölü', 'Marmara Gölü',
-      'İstanbul Boğazı', 'Çanakkale Boğazı', 'İzmit Körfezi', 'Saros Körfezi', 'Edremit Körfezi', 'Çandarlı Körfezi',
-      'İzmir Körfezi', 'Kuşadası Körfezi', 'Gökova Körfezi', 'Hisarönü Körfezi', 'Fethiye Körfezi', 'Antalya Körfezi',
-      'Mersin Körfezi', 'İskenderun Körfezi', 'Kızılırmak Deltası', 'Yeşilırmak Deltası', 'Çukurova', 'Gediz Deltası',
-      'Küçük Menderes Deltası', 'Büyük Menderes Deltası', 'Silifke Deltası', 'Tekke Yarımadası', 'İnceburun',
-      'Sinop Yarımadası', 'Gelibolu Yarımadası', 'Biga Yarımadası', 'Kocaeli Yarımadası', 'Çatalca Yarımadası',
-      'Türkiye iklimi', 'Akdeniz iklimi', 'Karasal iklim', 'Karadeniz iklimi', 'Marmara geçiş iklimi',
-      'Türkiye\'de deprem kuşakları', 'Kuzey Anadolu Fay Hattı', 'Batı Anadolu Fay Hattı', 'Doğu Anadolu Fay Hattı',
-      'Tektonik depremler', 'Türkiye\'nin milli parkları', 'Yedigöller Milli Parkı', 'Kuşcenneti Milli Parkı',
-      'Uludağ Milli Parkı', 'Spil Dağı Milli Parkı', 'Altınbeşik Mağarası Milli Parkı', 'Köprülü Kanyon Milli Parkı',
-      'Termessos Milli Parkı', 'Beydağları Sahil Milli Parkı', 'Olimpos Beydağları Milli Parkı', 'Göreme Tarihi Milli Parkı'
+      'Türkiye coğrafyası', 'Marmara Bölgesi', 'Ege Bölgesi', 'Akdeniz Bölgesi',
+      'İç Anadolu Bölgesi', 'Karadeniz Bölgesi', 'Doğu Anadolu Bölgesi',
+      'Güneydoğu Anadolu Bölgesi', 'Ağrı Dağı', 'Uludağ', 'Erciyes Dağı',
+      'Kuzey Anadolu Dağları', 'Toros Dağları', 'Kızılırmak', 'Yeşilırmak',
+      'Sakarya Nehri', 'Fırat Nehri', 'Dicle Nehri', 'Seyhan Nehri', 'Ceyhan Nehri',
+      'Büyük Menderes', 'Gediz Nehri', 'Van Gölü', 'Tuz Gölü', 'Beyşehir Gölü',
+      'Eğirdir Gölü', 'Sapanca Gölü', 'Abant Gölü',
+      'İstanbul Boğazı', 'Çanakkale Boğazı', 'İzmir Körfezi', 'Antalya Körfezi',
+      'Çukurova', 'Türkiye iklimi', 'Akdeniz iklimi', 'Karasal iklim',
+      'Karadeniz iklimi', 'Kuzey Anadolu Fay Hattı',
+      'Göreme Tarihi Milli Parkı', 'Yedigöller Milli Parkı',
     ]
   },
   {
     slug: 'fen',
     topics: [
-      // 1. Fen Bilimleri, Fizik, Kimya, Biyoloji (Yerli Bilim İnsanları ve Müfredat)
-      'Fizik', 'Kimya', 'Biyoloji', 'Astronomi', 'Evrim', 'Genetik', 'Hücre', 'DNA', 'Atom', 'Enerji',
-      'Yerçekimi', 'Güneş Sistemi', 'Fotosentez', 'Elektrik', 'Manyetizma', 'Termodinamik', 'Periyodik tablo', 'Işık',
-      'Kuantum mekaniği', 'Aziz Sancar', 'Oktay Sinanoğlu', 'Feza Gürsey', 'Behram Kurşunoğlu', 'Hulusi Behçet',
-      'Cahit Arf', 'Kerim Erim', 'Salih Murat Uzdilek', 'Nazım Terzioğlu', 'Fatin Gökmen', 'Ali Kuşçu', 'Takiyüddin',
-      'İbn Sina', 'Farabi', 'El-Kindi', 'El-Razi', 'El-Biruni', 'Harezmi', 'Ömer Hayyam', 'İbn el-Heysem', 'Cezeri',
-      'Proton', 'Nötron', 'Elektron', 'Kuantum', 'Foton', 'Gluon', 'Kara delik', 'Nötron yıldızı', 'Beyaz cüce',
-      'Süpernova', 'Büyük Patlama', 'Kozmik mikrodalga arka plan', 'Samanyolu', 'Andromeda', 'Exoplanet',
-      'Güneş rüzgarı', 'Manyetosfer', 'Aurora', 'Kutup ışıkları', 'İzafiyet teorisi', 'Özel görelilik', 'Genel görelilik',
-      'Kinetik enerji', 'Potansiyel enerji', 'Isı', 'Sıcaklık', 'Entropi', 'Termodinamiğin yasaları',
-      'Elektromanyetik dalgalar', 'Radyo dalgaları', 'Mikrodalga', 'Kızılötesi', 'Morötesi', 'X ışınları', 'Gama ışınları',
-      'Optik', 'Yansıma', 'Kırılma', 'Girişim', 'Kırınım', 'Polarizasyon', 'Asit', 'Baz', 'Tuz', 'pH ölçeği',
-      'Kimyasal bağ', 'Kovalent bağ', 'İyonik bağ', 'Metalik bağ', 'Hidrojen bağı', 'Mol kavramı', 'Avogadro sayısı',
-      'Çözelti', 'Çözünürlük', 'Redoks', 'Elektroliz', 'Organik kimya', 'Anorganik kimya', 'Polimer', 'Hücre zarı',
-      'Sitoplazma', 'Çekirdek', 'Mitokondri', 'Ribozom', 'Endoplazmik retikulum', 'Golgi aygıtı', 'Lizozom',
-      'Kloroplast', 'Koful', 'Hücre duvarı', 'Mayoz bölünme', 'Mitoz bölünme', 'Krossing-over', 'Mutasyon',
-      'Modifikasyon', 'Adaptasyon', 'Doğal seçilim', 'Biyolojik çeşitlilik', 'Ekosistem', 'Besin zinciri', 'Besin ağı',
-      'Üretici', 'Tüketici', 'Ayrıştırıcı', 'Karbon döngüsü', 'Azot döngüsü', 'Su döngüsü', 'Sera etkisi',
-      'Küresel ısınma', 'Ozon tabakası', 'Biyom', 'Tundra', 'Tayga', 'Çöl biyomu', 'Orman biyomu', 'Savan biyomu',
-      'Sucul ekosistem', 'Nükleer reaktör', 'Fisyon', 'Radyoaktif bozunma', 'Alfa ışıması', 'Beta ışıması', 'Yarı ömür'
+      'Fizik', 'Kimya', 'Biyoloji', 'Astronomi', 'Evrim', 'Genetik', 'Hücre', 'DNA',
+      'Atom', 'Enerji', 'Yerçekimi', 'Güneş Sistemi', 'Fotosentez', 'Elektrik',
+      'Manyetizma', 'Termodinamik', 'Periyodik tablo', 'Işık',
+      'Kuantum mekaniği', 'Aziz Sancar', 'Oktay Sinanoğlu', 'Feza Gürsey',
+      'Hulusi Behçet', 'Ali Kuşçu', 'İbn Sina', 'Farabi', 'El-Biruni', 'Harezmi',
+      'Ömer Hayyam', 'İbn el-Heysem', 'Cezeri',
+      'Proton', 'Nötron', 'Elektron', 'Kara delik', 'Beyaz cüce',
+      'Süpernova', 'Büyük Patlama', 'Samanyolu', 'Andromeda',
+      'İzafiyet teorisi', 'Kinetik enerji', 'Potansiyel enerji', 'Entropi',
+      'Elektromanyetik dalga', 'Radyo dalgası', 'Mikrodalga', 'X ışını',
+      'Optik', 'Yansıma', 'Kırılma', 'Asit', 'Baz', 'Tuz', 'pH',
+      'Kovalent bağ', 'İyonik bağ', 'Mol', 'Avogadro sayısı',
+      'Mitokondri', 'Ribozom', 'Mitoz bölünme', 'Mayoz bölünme',
+      'Mutasyon', 'Doğal seçilim', 'Ekosistem', 'Besin zinciri',
+      'Karbon döngüsü', 'Su döngüsü', 'Sera etkisi', 'Küresel ısınma',
+      'Ozon tabakası', 'Nükleer reaktör', 'Radyoaktif bozunma',
     ]
   },
   {
     slug: 'tarih',
     topics: [
-      // 1. Türk ve Dünya Tarihi (Türk Odaklı Kapsamlı Havuz)
-      'Tarih', 'İkinci Dünya Savaşı', 'Birinci Dünya Savaşı', 'Soğuk Savaş', 'Rönesans', 'Sanayi Devrimi',
-      'Fransız Devrimi', 'Bizans İmparatorluğu', 'İpek Yolu', 'Selçuklu Devleti', 'Cengiz Han', 'Kurtuluş Savaşı',
-      'Cumhuriyetin ilanı', 'Mezopotamya', 'Sümerler', 'Akadlar', 'Babil', 'Asurlular', 'Elam', 'Urartular',
-      'Hititler', 'Frigler', 'Lidyalılar', 'İyonlar', 'İskitler', 'Pers İmparatorluğu', 'Büyük İskender',
-      'Hellenistik Dönem', 'Roma Cumhuriyeti', 'Roma İmparatorluğu', 'Julius Caesar', 'Augustus', 'Pax Romana',
-      'Doğu Roma İmparatorluğu', 'Batı Roma İmparatorluğu', 'Kavimler Göçü', 'Orta Çağ', 'Feodalite',
-      'Haçlı Seferleri', 'Magna Carta', 'Yüz Yıl Savaşları', 'İstanbulun Fethi', 'Coğrafi Keşifler', 'Reform',
-      'Aydınlanma Çağı', 'Yedi Yıl Savaşları', 'Amerikan Bağımsızlık Bildirgesi', 'Fransız İhtilali', 'Viyana Kongresi',
-      '1848 İhtilalleri', 'Amerikan İç Savaşı', 'Birinci Dünya Savaşı Cepheleri', 'Çanakkale Cephesi',
-      'Kafkas Cephesi', 'Sina ve Filistin Cephesi', 'Milletler Cemiyeti', 'İspanyol İç Savaşı', 'Mussolini',
-      'Adolf Hitler', 'Joseph Stalin', 'Winston Churchill', 'Franklin D. Roosevelt', 'Normandiya Çıkarması',
-      'Stalingrad Muharebesi', 'Berlin Duvarı', 'Küba Füze Krizi', 'Vietnam Savaşı', 'Kore Savaşı', 'Uzay Yarışı',
-      'Berlinin Düşüşü', 'Yalta Konferansı', 'Potsdam Konferansı', 'Birleşmiş Milletler', 'NATO', 'Varşova Paktı',
-      'Avrupa Birliği', 'Asya Tarihi', 'Çin Hanedanlıkları', 'Qin Hanedanı', 'Han Hanedanı', 'Tang Hanedanı',
-      'Song Hanedanı', 'Ming Hanedanı', 'Qing Hanedanı', 'Büyük Çin Seddi', 'Japonya Tarihi', 'Samuray', 'Şogunluk',
-      'Meiji Restorasyonu', 'Hindistan Tarihi', 'Mogul İmparatorluğu', 'Tac Mahal', 'Aztekler', 'Mayalar', 'İnkalar',
-      'Pre-Kolomb Amerika', 'Afrika Tarihi', 'Kartaca', 'Mali İmparatorluğu', 'Songhay İmparatorluğu', 'Zulular',
-      'Osmanlı Kuruluş Dönemi', 'Osmanlı Yükselme Dönemi', 'Osmanlı Duraklama Dönemi', 'Osmanlı Gerileme Dönemi',
-      'Osmanlı Dağılma Dönemi', 'Tanzimat Fermanı', 'Islahat Fermanı', 'I. Meşrutiyet', 'II. Meşrutiyet',
-      'Trablusgarp Savaşı', 'Balkan Savaşları', 'Barbaros Hayrettin Paşa', 'Turgut Reis', 'Piri Reis',
-      'Sokullu Mehmet Paşa', 'Köprülüler Dönemi', 'Karlofça Antlaşması', 'Küçük Kaynarca Antlaşması', 'Sened-i İttifak',
-      'Kanun-i Esasi', '31 Mart Vakası', 'Osmanlı Padişahları', 'Osmanlı Donanması', 'Yeniçeri Ocağı', 'Devşirme sistemi',
-      'Tımar sistemi', 'Divan-ı Hümayun', 'Kapıkulu ocakları', 'Ahilik sistemi'
+      'İkinci Dünya Savaşı', 'Birinci Dünya Savaşı', 'Soğuk Savaş', 'Rönesans',
+      'Sanayi Devrimi', 'Fransız Devrimi', 'Bizans İmparatorluğu', 'İpek Yolu',
+      'Kurtuluş Savaşı', 'Mezopotamya', 'Sümerler', 'Babil', 'Asurlular',
+      'Hititler', 'Frigler', 'Lidyalılar', 'Pers İmparatorluğu',
+      'Büyük İskender', 'Roma İmparatorluğu', 'Julius Caesar', 'Augustus',
+      'Orta Çağ', 'Haçlı Seferleri', 'İstanbulun Fethi', 'Coğrafi Keşifler',
+      'Reform', 'Aydınlanma Çağı', 'Amerikan İç Savaşı',
+      'Çanakkale Cephesi', 'Milletler Cemiyeti', 'Adolf Hitler',
+      'Joseph Stalin', 'Winston Churchill', 'Normandiya Çıkarması',
+      'Stalingrad Muharebesi', 'Berlin Duvarı', 'Küba Füze Krizi',
+      'Vietnam Savaşı', 'Kore Savaşı', 'Uzay Yarışı', 'Birleşmiş Milletler',
+      'NATO', 'Varşova Paktı', 'Avrupa Birliği',
+      'Çin Seddi', 'Samuray', 'Meiji Restorasyonu', 'Tac Mahal',
+      'Aztekler', 'Mayalar', 'İnkalar', 'Kartaca',
+      'Osmanlı Kuruluş Dönemi', 'Osmanlı Yükselme Dönemi',
+      'Tanzimat Fermanı', 'Balkan Savaşları', 'Yeniçeri Ocağı',
+      'Devşirme sistemi', 'Tımar sistemi',
     ]
   },
   {
     slug: 'lgs',
     topics: [
-      // 1. LGS Müfredatı (MEB Odaklı Tüm Konular ve Alt Başlıklar)
-      'Matematik', 'Fen bilimleri', 'Türkçe', 'İnkılap tarihi ve Atatürkçülük', 'İngilizce',
-      'Din kültürü ve ahlak bilgisi', 'Hücre bölünmesi', 'Kuvvet ve hareket', 'Basınç', 'Madde ve endüstri',
-      'Basit makineler', 'Çarpanlar ve katlar', 'Üslü ifadeler', 'Kareköklü ifadeler', 'Veri analizi',
-      'Basit olayların olma olasılığı', 'Cebirsel ifadeler ve özdeşlikler', 'Doğrusal denklemler', 'Eşitsizlikler',
-      'Üçgenler', 'Eşlik ve benzerlik', 'Dönüşüm geometrisi', 'Geometrik cisimler', 'Mevsimlerin oluşumu',
-      'İklim ve hava hareketleri', 'DNA ve genetik kod', 'Kalıtım', 'Mutasyon ve modifikasyon', 'Adaptasyon',
-      'Biyoteknoloji', 'Katı basıncı', 'Sıvı basıncı', 'Gaz basıncı', 'Periyodik sistem',
-      'Fiziksel ve kimyasal değişimler', 'Kimyasal tepkimeler', 'Asitler ve bazlar', 'Maddenin ısı ile etkileşimi',
-      'Türkiye\'de kimya endüstrisi', 'İş güç enerji', 'Makaralar', 'Kaldıraçlar', 'Eğik düzlem', 'Dişli çarklar',
-      'Kıstrak ve çıkrık', 'Madde döngüleri', 'Sürdürülebilir kalkınma', 'Çevre sorunları',
-      'Biyoteknoloji uygulamaları', 'Elektrik yükleri ve elektriklenme', 'Elektrik yükleri ve elektrik akımı',
-      'Manyetizma', 'Işığın yayılması', 'Yansıma kanunları', 'Aynalar', 'Işığın kırılması', 'Mercekler',
-      'Ses dalgaları', 'Sesin yayılması', 'Sesin sürati', 'Sesin özellikleri', 'Sözcükte anlam', 'Cümlede anlam',
-      'Paragraf yorumu', 'Fiilimsiler', 'Cümlenin ögeleri', 'Fiilde çatılar', 'Cümle türleri', 'Anlatım bozuklukları',
-      'Yazım kuralları', 'Noktalama işaretleri', 'Metin türleri', 'Sözel mantık ve muhakeme', 'Bir Kahraman Doğuyor',
-      'Milli Uyanış: Bağımsızlık Yolunda Atılan Adımlar', 'Ya İstiklal Ya Ölüm', 'Atatürkçülük ve Çağdaşlaşan Türkiye',
-      'Demokratikleşme Çabaları', 'Atatürk Dönemi Türk Dış Politikası', 'Atatürk\'ün Ölümü ve Sonrası',
-      'Kader inancı', 'Zekat ve sadaka ibadeti', 'Din ve hayat', 'Hz. Muhammed\'in örnekliği',
-      'Kuran-ı Kerim ve özellikleri', 'Peygamberler ve ilahi kitaplar', 'İslam ve temizlik', 'Zararlı alışkanlıklar'
+      'Hücre bölünmesi', 'Kuvvet ve hareket', 'Basınç', 'Madde ve endüstri',
+      'Basit makineler', 'Çarpanlar ve katlar', 'Üslü ifadeler', 'Kareköklü ifadeler',
+      'Veri analizi', 'Olasılık', 'Cebirsel ifadeler', 'Doğrusal denklemler',
+      'Eşitsizlikler', 'Üçgenler', 'Eşlik ve benzerlik', 'Dönüşüm geometrisi',
+      'Geometrik cisimler', 'Mevsimlerin oluşumu', 'İklim ve hava hareketleri',
+      'DNA ve genetik kod', 'Kalıtım', 'Mutasyon ve modifikasyon', 'Adaptasyon',
+      'Biyoteknoloji', 'Sıvı basıncı', 'Gaz basıncı', 'Periyodik sistem',
+      'Kimyasal tepkimeler', 'Asitler ve bazlar', 'İş güç enerji',
+      'Makaralar', 'Kaldıraçlar', 'Eğik düzlem', 'Dişli çarklar',
+      'Madde döngüleri', 'Sürdürülebilir kalkınma', 'Çevre sorunları',
+      'Elektrik akımı', 'Manyetizma', 'Işığın yayılması', 'Yansıma',
+      'Aynalar', 'Mercekler', 'Ses dalgaları',
+      'Sözcükte anlam', 'Cümlede anlam', 'Paragraf', 'Fiilimsiler',
+      'Cümlenin ögeleri', 'Fiilde çatılar', 'Cümle türleri', 'Anlatım bozuklukları',
+      'Yazım kuralları', 'Noktalama işaretleri', 'Metin türleri',
+      'Bir Kahraman Doğuyor', 'Milli Uyanış', 'Ya İstiklal Ya Ölüm',
+      'Atatürkçülük', 'Demokratikleşme Çabaları',
     ]
   },
   {
     slug: 'genel-kultur-sorulari',
     topics: [
-      // 1. Felsefe, Sosyoloji, Psikoloji, Hukuk, Ekonomi (Türkçe Akademik ve Düşünce Hayatı)
-      'Felsefe', 'Psikoloji', 'Sosyoloji', 'Ekonomi', 'Hukuk', 'Uluslararası ilişkiler', 'Diplomasi',
-      'İnsan hakları', 'Demokrasi', 'Türk felsefe tarihi', 'İslam felsefesi', 'Farabi', 'İbn Sina', 'İbn Rüşd',
-      'Gazali', 'Sühreverdi', 'İbn Tufeyl', 'Molla Fenari', 'Kâtib Çelebi', 'Erzurumlu İbrahim Hakkı',
-      'İsmail Hakkı Bursevi', 'Ahmet Cevdet Paşa', 'Ziya Gökalp', 'Mehmet Akif Ersoy', 'Nurettin Topçu',
-      'Hilmi Ziya Ülken', 'İsmail Hakkı Baltacıoğlu', 'Mehmet Kaplan', 'Takiyettin Mengüşoğlu', 'Nusret Hızır',
-      'Macit Gökberk', 'Teoman Duralı', 'İoanna Kuçuradi', 'Mikroekonomi', 'Makroekonomi', 'Enflasyon', 'Deflasyon',
-      'Stagflasyon', 'Gayri Safi Yurtiçi Hasıla', 'Merkez bankası', 'Para politikası', 'Maliye politikası',
-      'Arz ve talep', 'Piyasa dengesi', 'Monopol', 'Oligopol', 'Serbest piyasa', 'Kapitalizm', 'Sosyalizm',
-      'Komünizm', 'Liberalizm', 'Keynesyen iktisat', 'Monetarizm', 'Anayasa hukuku', 'İdare hukuku', 'Medeni hukuk',
-      'Ceza hukuku', 'Ticaret hukuku', 'İş hukuku', 'Uluslararası kamu hukuku', 'Uluslararası özel hukuk',
-      'Yargıtay', 'Danıştay', 'Anayasa Mahkemesi', 'Sayıştay', 'Hakim', 'Savcı', 'Avukat', 'Noter', 'Baro',
-      'Kuvvetler ayrılığı', 'Yasama', 'Yürütme', 'Yargı', 'Seçim sistemi', 'Siyasi partiler', 'Parlamenter sistem',
-      'Başkanlık sistemi', 'Yarı başkanlık sistemi', 'Birleşmiş Milletler Güvenlik Konseyi', 'Uluslararası Adalet Divanı',
-      'Uluslararası Ceza Mahkemesi', 'Avrupa İnsan Hakları Mahkemesi', 'Cenevre Sözleşmesi', 'Viyana Sözleşmesi',
-      'İnsan Hakları Evrensel Beyannamesi', 'Sosyolojik teoriler', 'Psikolojik akımlar', 'Bilişsel psikoloji'
+      'Felsefe', 'Psikoloji', 'Sosyoloji', 'Ekonomi', 'Hukuk', 'Diplomasi',
+      'İnsan hakları', 'Demokrasi', 'İslam felsefesi', 'Farabi', 'İbn Sina',
+      'İbn Rüşd', 'Gazali', 'Ziya Gökalp', 'Mehmet Akif Ersoy', 'Nurettin Topçu',
+      'Mikroekonomi', 'Makroekonomi', 'Enflasyon', 'Gayri Safi Yurtiçi Hasıla',
+      'Merkez bankası', 'Para politikası', 'Arz ve talep', 'Serbest piyasa',
+      'Kapitalizm', 'Sosyalizm', 'Liberalizm', 'Keynesyen iktisat',
+      'Anayasa hukuku', 'Ceza hukumu', 'Ticaret hukuku',
+      'Yargıtay', 'Danıştay', 'Anayasa Mahkemesi',
+      'Kuvvetler ayrılığı', 'Yasama', 'Yürütme', 'Yargı',
+      'Seçim sistemi', 'Siyasi partiler', 'Parlamenter sistem',
+      'Başkanlık sistemi', 'Birleşmiş Milletler',
+      'İnsan Hakları Evrensel Beyannamesi', 'Bilişsel psikoloji',
     ]
   }
 ]
 
 const DIFFICULTIES = ['kolay', 'orta', 'zor', 'cok_zor', 'profesyonel']
 
-// Zorluk arttıkça: daha derin (ikincil/ilişkili) makalelere inme olasılığı
-// ve cümlenin extract içindeki pozisyonu artar (daha az bilinen detaylar).
 const DIFFICULTY_PROFILE = {
   kolay: { sentenceRange: [0, 1], deepDiveChance: 0 },
   orta: { sentenceRange: [1, 3], deepDiveChance: 0.15 },
@@ -328,11 +220,6 @@ const DIFFICULTY_PROFILE = {
 // ============================================
 // YARDIMCI FONKSİYONLAR
 // ============================================
-// Fisher-Yates: her permütasyonun eşit olasılıkla çıkmasını garanti eden
-// tek doğru karıştırma algoritması. Eski `sort(() => Math.random()-0.5)`
-// yöntemi istatistiksel olarak hafif taraflıydı (bazı sıralamalar diğerlerinden
-// daha sık çıkar); doğru şıkkın A/B/C/D arasında tam eşit dağılması için
-// bu kanıtlanmış doğru algoritma kullanılır.
 function shuffle(arr) {
   const result = [...arr]
   for (let i = result.length - 1; i > 0; i--) {
@@ -374,26 +261,16 @@ async function fetchJSON(url, { retries = 2, timeoutMs = 10000 } = {}) {
   return null
 }
 
-// Cümleyi temizler: parantez içi açıklamalar, IPA telaffuz işaretleri,
-// köşeli parantez referansları, fazla boşluklar vs. atılır.
 function cleanSentence(raw) {
   if (!raw) return ''
   let text = raw
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
-    // Sadece IPA telaffuz bloklarını hedefler (rakam içermeyen, kısa /.../ öbekleri).
-    // Eski kural rakam/URL/oran içeren her /.../ bloğunu (örn. "3/4", "km/sa") de
-    // silip cümleyi bozabiliyordu; artık yalnızca gerçek telaffuz işaretleri temizlenir.
     .replace(/\/[^/\d]{2,40}\//g, ' ')
-    // Üç nokta / Unicode elipsis (…) ve 2+ art arda nokta: bunlar Wikipedia
-    // özetlerinde "kesilmiş / devamı var" anlamına gelir. Şıklarda veya
-    // sorularda ASLA görünmemeli — burada tamamen kaldırılır, cümle daha
-    // sonra uzunluk ve tamlık kontrolünden geçerek ya kabul ya da reddedilir.
     .replace(/…/g, ' ')
     .replace(/\.{2,}/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:])/g, '$1')
-    // Cümle ortasında kalan yalnız virgül/tire gibi artık bağlaç kırıntılarını temizler
     .replace(/,\s*\./g, '.')
     .replace(/^[,;:\-–—\s]+/, '')
     .replace(/[,;:\-–—\s]+$/, '')
@@ -405,15 +282,8 @@ function cleanSentence(raw) {
   return text
 }
 
-// Elipsis temizlendikten sonra dahi metnin "yarım kalmış" görünmesine yol
-// açabilecek kalıpları (art arda virgül, tek başına bağlaç ile biten metin
-// vb.) yakalar. Böyle bir aday şık/cevap olarak ASLA kullanılmaz.
 const DANGLING_FRAGMENT_REGEX = /(,\s*$|:\s*$|-\s*$|\bve\s*\.$|\bile\s*\.$|\bveya\s*\.$)/i
 
-// Metin ASLA '…' ile kesilerek bozulmaz: belirtilen sınıra sığmayan aday
-// tamamen reddedilir (null döner), üretim akışı bunun yerine başka bir
-// cümle/konu dener. Bu sayede ekranda gösterilen her soru ve şık HER ZAMAN
-// eksiksiz, baştan sona doğru bir metindir.
 function fitsLimit(text, maxLen) {
   if (typeof text !== 'string') return false
   const trimmed = text.trim()
@@ -422,8 +292,6 @@ function fitsLimit(text, maxLen) {
   return true
 }
 
-// Wikipedia extract metnini cümlelere böler. Kısa/uzun ve yarım kalmış
-// cümleler burada elenir; sonuç her zaman kısa, net ve tam cümlelerdir.
 function splitSentences(extract) {
   if (!extract) return []
   return extract
@@ -437,18 +305,11 @@ const YEAR_ONLY_REGEX = /^\d{3,4}$/
 
 function isUsableOption(text) {
   if (!text) return false
-  // Yıl bazlı sorularda doğru/yanlış şıklar "1923" gibi kısa sayılardır,
-  // normal cümle şıklarından farklı bir uzunluk kuralına tabidir.
   if (YEAR_ONLY_REGEX.test(text)) return true
   if (DANGLING_FRAGMENT_REGEX.test(text)) return false
-  // Kısa, net, tek bakışta anlaşılır şıklar: çok uzun/karmaşık cümleler
-  // oyuncunun şıkları hızlıca ayırt etmesini zorlaştırır.
   return text.length >= 12 && text.length <= 130
 }
 
-// İki metin normalize edilmiş kelime kümesi bazında çok benzer mi?
-// (Yanlış şıkların doğru cevaba veya birbirine neredeyse aynı görünmesini
-// engeller — böylece her şık net ve birbirinden ayırt edilebilir kalır.)
 function normalizeForCompare(text) {
   return text
     .toLowerCase('tr-TR')
@@ -499,9 +360,6 @@ async function fetchRandomArticle() {
 // ============================================
 // SORU ÜRETİM MANTIĞI
 // ============================================
-
-// Bir maddenin cümlelerinden, zorluk seviyesine uygun bir "doğru cevap"
-// cümlesi seçer (kolay -> giriş cümlesi, zor -> derindeki detaylar).
 function pickFactSentence(sentences, difficulty) {
   if (sentences.length === 0) return null
   const [min, max] = DIFFICULTY_PROFILE[difficulty].sentenceRange
@@ -533,10 +391,6 @@ function buildQuestionRecord({ category, difficulty, questionText, correctText, 
   const validWrongs = wrongTexts.filter(isUsableOption)
   if (validWrongs.length < 3) return null
 
-  // Aynı metnin yanlış şık olarak iki kez görünmesini VE herhangi bir şıkkın
-  // doğru cevaba ya da başka bir şıkka neredeyse aynı görünmesini engelle.
-  // Bu sayede oyuncunun karşısına HER ZAMAN dört net, birbirinden tamamen
-  // ayırt edilebilir şık çıkar.
   const uniqueWrongs = []
   const seen = new Set([correctText.toLowerCase()])
   for (const w of validWrongs) {
@@ -554,6 +408,7 @@ function buildQuestionRecord({ category, difficulty, questionText, correctText, 
   const correctIndex = allAnswers.indexOf(correctText)
 
   return {
+    id: `${category}-${difficulty}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     category,
     difficulty,
     question_text: questionText,
@@ -566,13 +421,10 @@ function buildQuestionRecord({ category, difficulty, questionText, correctText, 
     source_url: sourceUrl,
     source_title: sourceTitle,
     is_active: true,
+    created_at: new Date().toISOString(),
   }
 }
 
-// Tip 1: Gerçek olgu tabanlı çoktan seçmeli soru.
-// Yanlış şıklar UYDURULMUYOR - başka gerçek Wikipedia maddelerinden alınan
-// GERÇEK ama bu soru için YANLIŞ olan cümlelerdir. Bu, eski sürümdeki
-// "X ile ilgili bir konudur" gibi anlamsız dolgu şıkların yerini alır.
 function generateDefinitionQuestion({ article, sentences, distractorSentences, difficulty, category }) {
   const factSentence = pickFactSentence(sentences, difficulty)
   if (!factSentence) return null
@@ -588,15 +440,12 @@ function generateDefinitionQuestion({ article, sentences, distractorSentences, d
     questionText: template(article.title),
     correctText,
     wrongTexts,
-    explanation: 'Bu bilgi, genel kültür bilgi havuzumuzdan derlenmiştir.',
+    explanation: 'Bu bilgi, Wikipedia kaynağından derlenmiştir.',
     sourceUrl: article.content_urls?.desktop?.page || `https://tr.wikipedia.org/wiki/${encodeURIComponent(article.title)}`,
     sourceTitle: article.title,
   })
 }
 
-// Tip 2: Yıl / tarih bilgisi sorusu. Metinde geçen gerçek bir yıl doğru
-// cevap olur; yanlış şıklar ona yakın ama farklı, birbirinden ayırt
-// edilebilir yıllardır (zorluk arttıkça aralık daralır -> daha zor).
 function generateYearQuestion({ article, sentences, difficulty, category }) {
   const yearRegex = /\b(1[0-9]{3}|20[0-9]{2})\b/
 
@@ -612,7 +461,6 @@ function generateYearQuestion({ article, sentences, difficulty, category }) {
   const pick = candidates[Math.floor(Math.random() * candidates.length)]
   const correctYear = pick.year
 
-  // Zorluk arttıkça yanlış yıllar doğru yıla daha yakın olur (ayırt etmek zorlaşır)
   const spread = { kolay: 60, orta: 35, zor: 18, cok_zor: 9, profesyonel: 5 }[difficulty] || 30
 
   const wrongYears = new Set()
@@ -644,15 +492,11 @@ function generateYearQuestion({ article, sentences, difficulty, category }) {
   })
 }
 
-// Bir konu için tam bir soru üretim akışı: makaleyi çeker, ilişkili
-// maddeleri (çeldirici havuzu için) çeker ve zorluğa uygun bir soru üretir.
 async function generateQuestionForTopic(topic, difficulty, category, seenTexts) {
   const profile = DIFFICULTY_PROFILE[difficulty]
   let article = await fetchSummary(topic)
   if (!article) return null
 
-  // Zorluk yüksekse belirli bir olasılıkla ana konu yerine onunla ilişkili
-  // daha az bilinen bir maddeye "derinlemesine" inilir.
   if (Math.random() < profile.deepDiveChance) {
     const related = await fetchRelatedTitles(topic, 8)
     if (related.length > 0) {
@@ -664,7 +508,6 @@ async function generateQuestionForTopic(topic, difficulty, category, seenTexts) 
   const sentences = splitSentences(article.extract)
   if (sentences.length === 0) return null
 
-  // Çeldirici (yanlış şık) havuzu için ilişkili maddelerden gerçek cümleler topla
   const relatedTitles = await fetchRelatedTitles(article.title, 10)
   const distractorPool = pickN(relatedTitles, Math.min(relatedTitles.length, 5))
 
@@ -680,8 +523,6 @@ async function generateQuestionForTopic(topic, difficulty, category, seenTexts) 
 
   let question = null
 
-  // %30 ihtimalle (ve metinde yıl varsa) sayısal/tarih sorusu dene,
-  // aksi halde ya da başarısız olursa tanım tabanlı soruya düş.
   if (Math.random() < 0.3) {
     question = generateYearQuestion({ article, sentences, difficulty, category })
   }
@@ -705,36 +546,66 @@ async function generateQuestionForTopic(topic, difficulty, category, seenTexts) 
   return question
 }
 
-// Daha önce eklenmiş soruları (metin bazlı) çekerek aynı soruların tekrar
-// tekrar havuza eklenmesini engellemeye çalışır (best-effort dedup).
-async function fetchExistingQuestionTexts() {
-  const seen = new Set()
+// ============================================
+// JSON SORU HAVUZU YÖNETİMİ
+// ============================================
+// Sorular Supabase'e DEĞİL, GitHub Pages üzerinde JSON olarak saklanır.
+// Her Cron çalışmasında yalnızca YENİ sorular eklenir, mevcut sorular
+// silinmez ve yinelenen kayıt oluşmaz.
+
+function loadExistingQuestions() {
   try {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('category, question_text, option_a')
-      .order('created_at', { ascending: false })
-      .limit(2000)
-    if (error) throw error
-    for (const row of data || []) {
-      seen.add(`${row.category}|${row.question_text}|${row.option_a}`.toLowerCase())
-    }
+    if (!existsSync(QUESTIONS_FILE)) return []
+    const raw = readFileSync(QUESTIONS_FILE, 'utf-8')
+    const data = JSON.parse(raw)
+    if (Array.isArray(data)) return data
+    if (data && Array.isArray(data.questions)) return data.questions
+    return []
   } catch (err) {
-    console.warn('Mevcut sorular çekilemedi (dedup atlanıyor):', err.message)
+    console.warn('Mevcut soru havuzu okunamadı, sıfırdan başlanıyor:', err.message)
+    return []
+  }
+}
+
+function saveQuestions(questions) {
+  const dir = dirname(QUESTIONS_FILE)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  const output = {
+    generated_at: new Date().toISOString(),
+    total: questions.length,
+    questions,
+  }
+  writeFileSync(QUESTIONS_FILE, JSON.stringify(output, null, 2), 'utf-8')
+}
+
+function buildDedupeSet(existingQuestions) {
+  const seen = new Set()
+  for (const q of existingQuestions) {
+    const key = `${q.category}|${q.question_text}|${q.option_a}`.toLowerCase()
+    seen.add(key)
   }
   return seen
 }
 
+// ============================================
+// ANA AKIŞ
+// ============================================
 async function run() {
   const startedAt = Date.now()
   console.log('═══════════════════════════════════════════════')
   console.log('  Soru Havuzu Güncelleme — Wikipedia Kaynaklı')
+  console.log('  Sorular JSON olarak GitHub Pages üzerinde saklanır')
   console.log('═══════════════════════════════════════════════')
 
-  const seenTexts = await fetchExistingQuestionTexts()
-  console.log(`Dedup için ${seenTexts.size} mevcut soru imzası yüklendi.`)
+  // Mevcut soru havuzunu yükle
+  const existingQuestions = loadExistingQuestions()
+  console.log(`Mevcut soru havuzu: ${existingQuestions.length} soru`)
 
-  const questionsToInsert = []
+  // Dedup kümesi oluştur
+  const seenTexts = buildDedupeSet(existingQuestions)
+  console.log(`Dedup için ${seenTexts.size} soru imzası yüklendi.`)
+
+  const newQuestions = []
   const stats = {}
 
   for (const cat of CATEGORIES) {
@@ -749,7 +620,7 @@ async function run() {
           try {
             const q = await generateQuestionForTopic(topic, difficulty, cat.slug, seenTexts)
             if (q) {
-              questionsToInsert.push(q)
+              newQuestions.push(q)
               stats[cat.slug]++
             }
           } catch (err) {
@@ -759,11 +630,11 @@ async function run() {
         }
       }
     }
-    console.log(`  ✓ ${cat.slug}: ${stats[cat.slug]} soru üretildi`)
+    console.log(`  ✓ ${cat.slug}: ${stats[cat.slug]} yeni soru`)
   }
 
-  // "karisik" kategorisi için rastgele + bir seviye derinlemesine makale taraması
-  console.log('\n▶ Kategori: karisik (rastgele + derinlemesine tarama)')
+  // "karisik" kategorisi için rastgele makale taraması
+  console.log('\n▶ Kategori: karisik (rastgele tarama)')
   stats['karisik'] = 0
   const RANDOM_ARTICLE_COUNT = 20
 
@@ -772,7 +643,6 @@ async function run() {
       let article = await fetchRandomArticle()
       if (!article?.extract) continue
 
-      // %40 ihtimalle bir adım daha derine inip ilişkili bir maddeye geç
       if (Math.random() < 0.4) {
         const related = await fetchRelatedTitles(article.title, 8)
         if (related.length > 0) {
@@ -816,7 +686,7 @@ async function run() {
         const dedupeKey = `${q.category}|${q.question_text}|${q.option_a}`.toLowerCase()
         if (!seenTexts.has(dedupeKey)) {
           seenTexts.add(dedupeKey)
-          questionsToInsert.push(q)
+          newQuestions.push(q)
           stats['karisik']++
         }
       }
@@ -825,34 +695,24 @@ async function run() {
     }
     await sleep(150)
   }
-  console.log(`  ✓ karisik: ${stats['karisik']} soru üretildi`)
+  console.log(`  ✓ karisik: ${stats['karisik']} yeni soru`)
 
   // ============================================
-  // VERİTABANINA YAZMA
+  // JSON DOSYASINA YAZMA (incremental merge)
   // ============================================
-  console.log(`\n${questionsToInsert.length} yeni soru veritabanına yazılıyor...`)
-
-  let inserted = 0
-  for (let i = 0; i < questionsToInsert.length; i += 50) {
-    const batch = questionsToInsert.slice(i, i + 50)
-    const { error } = await supabase.from('questions').insert(batch)
-    if (error) {
-      console.error(`  ✗ Batch ${Math.floor(i / 50) + 1} eklenemedi: ${error.message}`)
-    } else {
-      inserted += batch.length
-      console.log(`  ✓ Batch ${Math.floor(i / 50) + 1}: ${batch.length} soru eklendi`)
-    }
-  }
+  const allQuestions = [...existingQuestions, ...newQuestions]
+  saveQuestions(allQuestions)
 
   const durationSec = ((Date.now() - startedAt) / 1000).toFixed(1)
   console.log('\n═══════════════════════════════════════════════')
-  console.log(`  Tamamlandı: ${inserted}/${questionsToInsert.length} soru eklendi (${durationSec}s)`)
+  console.log(`  Tamamlandı: ${newQuestions.length} yeni soru eklendi`)
+  console.log(`  Toplam soru havuzu: ${allQuestions.length} soru`)
+  console.log(`  Süre: ${durationSec}s`)
   Object.entries(stats).forEach(([slug, n]) => console.log(`   - ${slug}: ${n}`))
   console.log('═══════════════════════════════════════════════')
 
-  if (questionsToInsert.length > 0 && inserted === 0) {
-    // Hiçbir şey yazılamadıysa CI'da görünür bir hata ile çık
-    process.exit(1)
+  if (newQuestions.length === 0) {
+    console.log('  Yeni soru üretilmedi. Havuz korundu.')
   }
 }
 
