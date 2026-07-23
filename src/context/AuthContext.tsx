@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean
   passwordRecovery: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string, username: string) => Promise<{ error: string | null }>
+  signUp: (email: string, password: string, username: string, avatarFile?: File | null) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, username: string, avatarFile?: File | null) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -107,9 +107,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: message }
     }
     if (data.user) {
+      const updates: Record<string, unknown> = {
+        is_online: true,
+        last_seen: new Date().toISOString(),
+      }
+
+      // Avatarı yalnızca hemen bir oturum varsa yükleyebiliriz (e-posta onayı
+      // kapalıysa signUp anında session döner). Onay açıksa, kullanıcı ilk
+      // giriş yaptıktan sonra avatarını profil ekranından ekleyebilir.
+      if (avatarFile && data.session) {
+        const ext = avatarFile.name.split('.').pop() || 'jpg'
+        const path = `${data.user.id}/avatar.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, avatarFile, { upsert: true })
+        if (uploadError) {
+          console.error('Avatar upload error:', uploadError)
+        } else {
+          const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path)
+          updates.avatar_url = `${publicUrlData.publicUrl}?t=${Date.now()}`
+        }
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ is_online: true, last_seen: new Date().toISOString() })
+        .update(updates)
         .eq('id', data.user.id)
       if (profileError) {
         console.error('Profile update after signUp failed:', profileError)
