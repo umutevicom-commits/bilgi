@@ -43,7 +43,7 @@ export function AdBanner({ placement }: { placement: 'home' | 'game_top' | 'game
       {ad.target_url ? (
         <a href={ad.target_url} target="_blank" rel="noopener noreferrer" className="block">
           {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title || 'Reklam'} className="w-full rounded-lg" />
+            <img src={ad.image_url} alt={ad.title || 'Reklam'} loading="lazy" decoding="async" className="w-full rounded-lg" />
           ) : (
             <div>
               {ad.title && <h4 className="font-semibold text-cream-100 mb-1">{ad.title}</h4>}
@@ -59,7 +59,7 @@ export function AdBanner({ placement }: { placement: 'home' | 'game_top' | 'game
       ) : (
         <div>
           {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title || 'Reklam'} className="w-full rounded-lg" />
+            <img src={ad.image_url} alt={ad.title || 'Reklam'} loading="lazy" decoding="async" className="w-full rounded-lg" />
           ) : (
             <div>
               {ad.title && <h4 className="font-semibold text-cream-100 mb-1">{ad.title}</h4>}
