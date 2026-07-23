@@ -31,18 +31,18 @@ try {
 }
 
 /**
- * Türkçe için Piper'ın resmi "medium" kalite sesi: dfki.
+ * Türkçe için Piper'ın resmi ses deposunda (huggingface.co/rhasspy/piper-voices)
+ * hâlâ mevcut olan TEK "medium" kalite ses: dfki.
  *
- * ÖNEMLİ: Daha önce burada `tr_TR-fahrettin-medium` kullanılıyordu, ancak
- * bu ses (ve `fettah`) Hugging Face'teki rhasspy/piper-voices deposunun
- * `main` dalından katkıcıların talebiyle kaldırıldı. Paket modelleri hep
- * `.../resolve/main/...` üzerinden indirdiği için bu isimle indirme her
- * seferinde 404 ile başarısız oluyor, `primePiper()` sürekli `false`
- * dönüyor ve oyun sessizce tarayıcının SpeechSynthesis motoruna düşüyordu
- * — yani Piper hiçbir zaman gerçekten devreye giremiyordu.
- *
- * `dfki`, main dalında hâlâ mevcut olan tek tr_TR sesi olduğu için
- * güvenilir çalışması için bu değere sabitlendi.
+ * NOT: Daha önce burada `tr_TR-fahrettin-medium` kullanılıyordu, ancak
+ * fahrettin ve fettah sesleri katkıda bulunanların talebiyle depodan
+ * kaldırıldı (bkz. rhasspy/piper-voices commit "Remove fahrettin and
+ * fettah voices at request of contributors"). O ID artık indirilemiyor;
+ * `tts.download()` 404 ile başarısız oluyor, `primePiper()` her zaman
+ * `false` dönüyor ve uygulama sessizce tarayıcının SpeechSynthesis
+ * motoruna düşüyordu — yani gerçek Piper sesi hiç duyulmuyordu. dfki şu an
+ * için tek çalışan seçenek olduğundan bu bir A/B tercihi değil, doğrudan
+ * bir düzeltmedir.
  */
 export const PIPER_VOICE_ID = 'tr_TR-dfki-medium'
 
@@ -75,29 +75,10 @@ export function primePiper(onProgress?: (p: PiperProgress) => void): Promise<boo
 
   readyState = 'loading'
   readyPromise = (async () => {
-    // İndirme (~60-100MB) bazı ağlarda/eklenti-engelleyicilerde hiç
-    // bitmeden sonsuza dek "loading" durumunda takılabiliyordu — bu durumda
-    // ne hata fırlıyordu ne de tarayıcı sesine düşüş netleşiyordu. Artık
-    // 25 saniye içinde bitmezse bunu açık bir hataya çeviriyoruz, son
-    // bilinen ilerleme yüzdesiyle birlikte.
-    let lastProgress: PiperProgress | null = null
-    const DOWNLOAD_TIMEOUT_MS = 25000
     try {
       const stored = await tts.stored()
       if (!stored.includes(PIPER_VOICE_ID)) {
-        const downloadPromise = tts.download(PIPER_VOICE_ID, (p: PiperProgress) => {
-          lastProgress = p
-          onProgress?.(p)
-        })
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            const pct = lastProgress
-              ? `${Math.round(((lastProgress as PiperProgress).loaded * 100) / (lastProgress as PiperProgress).total)}%`
-              : 'hiç başlamadı (0%)'
-            reject(new Error(`İndirme ${DOWNLOAD_TIMEOUT_MS / 1000} saniyede tamamlanamadı, son ilerleme: ${pct}`))
-          }, DOWNLOAD_TIMEOUT_MS)
-        })
-        await Promise.race([downloadPromise, timeoutPromise])
+        await tts.download(PIPER_VOICE_ID, (p: PiperProgress) => onProgress?.(p))
       }
       readyState = 'ready'
       return true
@@ -106,21 +87,6 @@ export function primePiper(onProgress?: (p: PiperProgress) => void): Promise<boo
         '[piperEngine] Piper sesi yüklenemedi, tarayıcının kendi sesine geri dönülüyor.',
         err
       )
-      // Mobil cihazlarda geliştirici konsoluna erişim genelde mümkün
-      // olmadığı için, ?piperdebug=1 ile açıldığında gerçek hatayı
-      // doğrudan ekranda (alert) gösteriyoruz. Normal kullanıcılar bunu
-      // hiç görmez — sadece teşhis amaçlı, opt-in bir kapı.
-      if (typeof window !== 'undefined') {
-        try {
-          const debugOn = new URLSearchParams(window.location.search).get('piperdebug') === '1'
-          if (debugOn) {
-            const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-            window.alert(`[Piper hata ayıklama]\nSes: ${PIPER_VOICE_ID}\n\n${message}`)
-          }
-        } catch {
-          // alert/URLSearchParams bir sebepten kullanılamıyorsa sessizce geç
-        }
-      }
       readyState = 'failed'
       return false
     }

@@ -13,12 +13,16 @@
  * proje için uygun değil.
  *
  * NEDEN Piper TTS:
- * Piper (rhasspy/piper), resmi "medium" kalitede üç Türkçe sesi olan,
- * WebAssembly ile tamamen tarayıcıda çalışabilen, VITS tabanlı hafif bir
- * nöral TTS modelidir (@mintplex-labs/piper-tts-web paketi). Sunucu/GPU
- * gerekmez, GitHub Pages ile tam uyumludur. Tek maliyeti: ilk kullanımda
- * ~60MB'lık ses modelinin indirilip tarayıcıda önbelleğe alınmasıdır
- * (bkz. piperEngine.ts).
+ * Piper (rhasspy/piper), WebAssembly ile tamamen tarayıcıda çalışabilen,
+ * VITS tabanlı hafif bir nöral TTS modelidir (@mintplex-labs/piper-tts-web
+ * paketi). Sunucu/GPU gerekmez, GitHub Pages ile tam uyumludur. Tek
+ * maliyeti: ilk kullanımda ses modelinin indirilip tarayıcıda önbelleğe
+ * alınmasıdır (bkz. piperEngine.ts).
+ *
+ * Not: Resmi Türkçe ses deposunda üç seçenek vardı (fahrettin, fettah,
+ * dfki); fahrettin ve fettah sonradan depodan kaldırıldı, şu an tek
+ * çalışan seçenek "dfki (medium)" — bkz. piperEngine.ts'teki PIPER_VOICE_ID
+ * notu.
  *
  * "SORUNSUZ" NASIL SAĞLANIYOR:
  * Piper modeli indirilene kadar (birkaç saniyeden bir dakikaya kadar
