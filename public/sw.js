@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kim-milyoner-v4';
+const CACHE_NAME = 'bilgi-yarismasi-v5';
 // Vite build "base" ayarı ('/bilgi/') ile eşleşmeli, aksi halde GitHub Pages
 // alt dizininde önbellek asla isabet etmez ve offline destek çalışmaz.
 const BASE = '/bilgi/';
