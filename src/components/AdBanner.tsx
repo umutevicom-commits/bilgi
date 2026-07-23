@@ -30,6 +30,29 @@ export function AdBanner({ placement }: { placement: 'home' | 'game_top' | 'game
 
   if (loading || !ad) return null
 
+  const content = (
+    <>
+      {ad.image_url ? (
+        <img
+          src={ad.image_url}
+          alt={ad.title || 'Reklam'}
+          loading="lazy"
+          decoding="async"
+          className="w-full rounded-lg"
+        />
+      ) : (
+        <div>
+          {ad.title && <h4 className="font-semibold text-cream-100 mb-1">{ad.title}</h4>}
+          {ad.content_html && (
+            <p className="text-sm text-primary-300 whitespace-pre-line break-anywhere">
+              {ad.content_html.replace(/<[^>]*>/g, '')}
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  )
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -42,36 +65,10 @@ export function AdBanner({ placement }: { placement: 'home' | 'game_top' | 'game
       </span>
       {ad.target_url ? (
         <a href={ad.target_url} target="_blank" rel="noopener noreferrer" className="block">
-          {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title || 'Reklam'} loading="lazy" decoding="async" className="w-full rounded-lg" />
-          ) : (
-            <div>
-              {ad.title && <h4 className="font-semibold text-cream-100 mb-1">{ad.title}</h4>}
-              {ad.content_html && (
-                <div
-                  className="text-sm text-primary-300"
-                  dangerouslySetInnerHTML={{ __html: ad.content_html }}
-                />
-              )}
-            </div>
-          )}
+          {content}
         </a>
       ) : (
-        <div>
-          {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title || 'Reklam'} loading="lazy" decoding="async" className="w-full rounded-lg" />
-          ) : (
-            <div>
-              {ad.title && <h4 className="font-semibold text-cream-100 mb-1">{ad.title}</h4>}
-              {ad.content_html && (
-                <div
-                  className="text-sm text-primary-300"
-                  dangerouslySetInnerHTML={{ __html: ad.content_html }}
-                />
-              )}
-            </div>
-          )}
-        </div>
+        content
       )}
     </motion.div>
   )
