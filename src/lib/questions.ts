@@ -20,34 +20,44 @@ export async function loadQuestions(): Promise<Question[]> {
   }
 }
 
+function randomPick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
 export function pickRandomQuestion(
   questions: Question[],
   difficulty: DifficultyLevel,
   category: string,
   usedIds: Set<string>
 ): Question | null {
-  let pool = questions.filter(
-    (q) => q.is_active && q.difficulty === difficulty
-  )
+  const active = questions.filter((q) => q.is_active)
 
-  if (category !== 'karisik') {
-    const filtered = pool.filter((q) => q.category === category)
-    if (filtered.length > 0) pool = filtered
-  }
+  // "karisik" tüm kategorileri kapsar; diğerleri SADECE seçilen kategoriyi.
+  const byCategory = category === 'karisik'
+    ? active
+    : active.filter((q) => q.category === category)
 
-  const available = pool.filter((q) => !usedIds.has(q.id))
-  if (available.length > 0) {
-    return available[Math.floor(Math.random() * available.length)]
-  }
+  // 1) Seçilen kategori + seçilen zorluk + daha önce görülmemiş
+  let pool = byCategory.filter((q) => q.difficulty === difficulty && !usedIds.has(q.id))
+  if (pool.length > 0) return randomPick(pool)
 
-  if (pool.length > 0) {
-    return pool[Math.floor(Math.random() * pool.length)]
-  }
+  // 2) Seçilen kategori (zorluk esnetilir) + daha önce görülmemiş.
+  //    Kategori sözü burada da korunuyor; sadece zorluk havuzu genişliyor.
+  pool = byCategory.filter((q) => !usedIds.has(q.id))
+  if (pool.length > 0) return randomPick(pool)
 
-  const anyActive = questions.filter((q) => q.is_active)
-  if (anyActive.length > 0) {
-    return anyActive[Math.floor(Math.random() * anyActive.length)]
-  }
+  // 3) Bu kategoride görülmemiş soru tükendi. Oyunun tamamen durmaması
+  //    için aynı kategoride, görülmüş de olsa bir soru seçilir — bu, sadece
+  //    kategori gerçekten tükendiğinde devreye giren son çaredir.
+  if (byCategory.length > 0) return randomPick(byCategory)
 
-  return null
+  // 4) Seçilen kategoride hiç soru yoksa (çok nadir/yeni kategori), en
+  //    azından zorluğa uyan görülmemiş bir soruya düş.
+  pool = active.filter((q) => q.difficulty === difficulty && !usedIds.has(q.id))
+  if (pool.length > 0) return randomPick(pool)
+
+  pool = active.filter((q) => !usedIds.has(q.id))
+  if (pool.length > 0) return randomPick(pool)
+
+  return active.length > 0 ? randomPick(active) : null
 }
