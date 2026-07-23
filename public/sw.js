@@ -1,5 +1,7 @@
-const CACHE_NAME = 'kim-milyoner-v3';
-const BASE = '/';
+const CACHE_NAME = 'kim-milyoner-v4';
+// Vite build "base" ayarı ('/bilgi/') ile eşleşmeli, aksi halde GitHub Pages
+// alt dizininde önbellek asla isabet etmez ve offline destek çalışmaz.
+const BASE = '/bilgi/';
 const STATIC_ASSETS = [BASE, `${BASE}index.html`, `${BASE}manifest.json`, `${BASE}favicon.svg`];
 
 self.addEventListener('install', (event) => {

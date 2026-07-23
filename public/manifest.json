@@ -3,15 +3,16 @@
   "short_name": "Milyoner",
   "description": "Türkiye temalı sonsuz bilgi yarışması",
   "lang": "tr",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/bilgi/",
+  "scope": "/bilgi/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#050816",
   "theme_color": "#050816",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
