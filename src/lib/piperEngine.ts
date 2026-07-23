@@ -75,10 +75,29 @@ export function primePiper(onProgress?: (p: PiperProgress) => void): Promise<boo
 
   readyState = 'loading'
   readyPromise = (async () => {
+    // İndirme (~60-100MB) bazı ağlarda/eklenti-engelleyicilerde hiç
+    // bitmeden sonsuza dek "loading" durumunda takılabiliyordu — bu durumda
+    // ne hata fırlıyordu ne de tarayıcı sesine düşüş netleşiyordu. Artık
+    // 25 saniye içinde bitmezse bunu açık bir hataya çeviriyoruz, son
+    // bilinen ilerleme yüzdesiyle birlikte.
+    let lastProgress: PiperProgress | null = null
+    const DOWNLOAD_TIMEOUT_MS = 25000
     try {
       const stored = await tts.stored()
       if (!stored.includes(PIPER_VOICE_ID)) {
-        await tts.download(PIPER_VOICE_ID, (p: PiperProgress) => onProgress?.(p))
+        const downloadPromise = tts.download(PIPER_VOICE_ID, (p: PiperProgress) => {
+          lastProgress = p
+          onProgress?.(p)
+        })
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            const pct = lastProgress
+              ? `${Math.round(((lastProgress as PiperProgress).loaded * 100) / (lastProgress as PiperProgress).total)}%`
+              : 'hiç başlamadı (0%)'
+            reject(new Error(`İndirme ${DOWNLOAD_TIMEOUT_MS / 1000} saniyede tamamlanamadı, son ilerleme: ${pct}`))
+          }, DOWNLOAD_TIMEOUT_MS)
+        })
+        await Promise.race([downloadPromise, timeoutPromise])
       }
       readyState = 'ready'
       return true
