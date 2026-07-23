@@ -1,7 +1,7 @@
 {
-  "name": "Bilgi Bankası",
-  "short_name": "Bilgi",
-  "description": "Sonsuz soru - Puan sistemi √",
+  "name": "Kim Milyoner Olmak İster? - Türkiye Bilgi Yarışması",
+  "short_name": "Milyoner",
+  "description": "Türkiye temalı sonsuz bilgi yarışması",
   "lang": "tr",
   "start_url": "/bilgi/",
   "scope": "/bilgi/",
