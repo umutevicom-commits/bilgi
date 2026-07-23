@@ -1,8 +1,8 @@
 /*
-# Kim Milyoner Olmak İster - Veritabanı Şeması
+# Bilgi Yarışması - Veritabanı Şeması
 
 ## Genel Bakış
-Bu migration, Kim Milyoner Olmak İster bilgi yarışması için tüm veritabanı
+Bu migration, Bilgi Yarışması bilgi yarışması için tüm veritabanı
 altyapısını oluşturur. Sistem puan tabanlıdır, üyelik gerektirir ve Supabase
 Auth kullanır.
 
@@ -407,13 +407,13 @@ ON CONFLICT (slug) DO NOTHING;
 -- VARSAYILAN SITE AYARLARI
 -- ============================================
 INSERT INTO site_settings (key, value) VALUES
-  ('question_time_seconds', '60'),
+  ('question_time_seconds', '45'),
   ('points_easy', '10'),
   ('points_medium', '20'),
   ('points_hard', '30'),
   ('points_very_hard', '50'),
   ('points_professional', '100'),
-  ('site_name', 'Kim Milyoner Olmak İster'),
-  ('site_url', 'https://kimmilyoner.eu.cc/'),
+  ('site_name', 'Bilgi Yarışması'),
+  ('site_url', 'https://example.com/'),
   ('admin_login_url', '/auth?admin_key=H4md1U2024')
 ON CONFLICT (key) DO NOTHING;
