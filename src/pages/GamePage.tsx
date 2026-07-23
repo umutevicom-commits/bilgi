@@ -3,9 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameEngine } from '../hooks/useGameEngine'
 import { AdBanner } from '../components/AdBanner'
-import { BorderBeam } from '../components/BorderBeam'
-import { playTick, playTimeUp } from '../lib/sound'
-import { vibrateTick, vibrateTimeUp } from '../lib/haptics'
 import { DIFFICULTY_LABELS, DIFFICULTY_POINTS, DIFFICULTY_COLORS } from '../types'
 import {
   Home, Coffee, Trophy, X, Users, Phone, Lightbulb,
@@ -16,8 +13,6 @@ import {
 const AUTO_ADVANCE_SECONDS_CORRECT = 3
 // Yanlış/süre dolduğunda doğru cevabı okuyabilmesi için biraz daha uzun süre
 const AUTO_ADVANCE_SECONDS_WRONG = 5
-// Geri sayımın bu saniyeden itibaren "kritik" (titreşim + tık sesi) sayılacağı eşik
-const URGENT_THRESHOLD_SECONDS = 10
 
 export default function GamePage() {
   const navigate = useNavigate()
@@ -95,39 +90,6 @@ export default function GamePage() {
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showResult, isCorrect, showEndModal, question?.id])
-
-  // Son 10 saniyede her saniye "tick" sesi + hafif titreşim. `timeLeft`
-  // zaten oyun motoru tarafından saniyede bir güncelleniyor; burada yalnızca
-  // o değişime tepki veriyoruz (yeni bir sayaç kurmuyoruz), böylece mevcut
-  // oyun mantığına dokunmadan salt sunum (UI) katmanında çalışıyor.
-  const lastTickedSecondRef = useRef<number | null>(null)
-  useEffect(() => {
-    if (loading || showResult || !question) {
-      lastTickedSecondRef.current = null
-      return
-    }
-    if (
-      timeLeft > 0 &&
-      timeLeft <= URGENT_THRESHOLD_SECONDS &&
-      lastTickedSecondRef.current !== timeLeft
-    ) {
-      lastTickedSecondRef.current = timeLeft
-      playTick()
-      vibrateTick()
-    }
-  }, [timeLeft, showResult, loading, question])
-
-  // Süre tamamen dolduğunda (manuel cevaplamadan farklı olarak) tık
-  // sesinden belirgin şekilde farklı bir uyarı sesi + daha güçlü titreşim.
-  // Her soru için yalnızca bir kez tetiklenir.
-  const timeUpAlertedForRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (showResult && selectedAnswer === 'timeout' && question && timeUpAlertedForRef.current !== question.id) {
-      timeUpAlertedForRef.current = question.id
-      playTimeUp()
-      vibrateTimeUp()
-    }
-  }, [showResult, selectedAnswer, question])
 
   if (loading) {
     return (
@@ -209,12 +171,7 @@ export default function GamePage() {
 
       {/* Timer */}
       <div className="flex justify-center mb-6">
-        <div
-          className={`relative w-20 h-20 ${
-            timeLeft <= URGENT_THRESHOLD_SECONDS && timeLeft > 0 && !showResult ? 'animate-timer-shake' : ''
-          }`}
-          style={{ transform: 'translateZ(0)' }}
-        >
+        <div className="relative w-20 h-20">
           <svg className="timer-ring w-full h-full" viewBox="0 0 80 80">
             <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(168,189,212,0.1)" strokeWidth="4" />
             <circle
@@ -238,12 +195,11 @@ export default function GamePage() {
         key={question.id}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="question-card relative p-6 mb-6 overflow-hidden"
+        className="question-card p-6 mb-6"
       >
         <p className="text-lg sm:text-xl text-cream-100 text-center font-medium leading-relaxed text-balance break-anywhere">
           {question.question_text}
         </p>
-        <BorderBeam size={140} duration={7} borderWidth={1.5} colorFrom="#f5b041" colorTo="#4d7aa8" />
       </motion.div>
 
       {/* Options */}
