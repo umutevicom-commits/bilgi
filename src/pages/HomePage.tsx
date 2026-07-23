@@ -168,10 +168,10 @@ export default function HomePage() {
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between mb-8"
+        className="flex items-center justify-between gap-3 mb-8 flex-wrap"
       >
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative flex-shrink-0">
             <button
               type="button"
               onClick={handleAvatarClick}
@@ -183,6 +183,7 @@ export default function HomePage() {
                 <img
                   src={profile.avatar_url}
                   alt={profile.username}
+                  decoding="async"
                   className={`w-12 h-12 rounded-full object-cover ${profile.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}
                 />
               ) : (
@@ -207,12 +208,13 @@ export default function HomePage() {
                 accept="image/*"
                 onChange={handleAvatarChange}
                 className="hidden"
+                aria-label="Avatar yükle"
               />
             )}
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-cream-100">{profile?.username || 'Misafir'}</h2>
+              <h2 className="text-lg font-semibold text-cream-100 truncate">{profile?.username || 'Misafir'}</h2>
               {getBadge()}
             </div>
             <div className="flex items-center gap-1 text-sm">
@@ -223,38 +225,38 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-          <div className="flex items-center gap-2">
-            {profile?.is_admin && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="btn-accent text-sm flex items-center gap-1"
-              >
-                <Shield size={16} />
-                <span className="hidden sm:inline">Admin Paneli</span>
-              </button>
-            )}
-            {isGuest ? (
-              <button
-                onClick={() => navigate('/auth')}
-                className="btn-accent text-sm flex items-center gap-1"
-              >
-                <LogIn size={16} />
-                <span>Giriş Yap</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => signOut()}
-                className="btn-ghost text-sm flex items-center gap-1"
-              >
-                <LogOut size={16} />
-                <span className="hidden sm:inline">Çıkış</span>
-              </button>
-            )}
-          </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {profile?.is_admin && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="btn-accent text-sm flex items-center gap-1"
+            >
+              <Shield size={16} />
+              <span className="hidden sm:inline">Admin Paneli</span>
+            </button>
+          )}
+          {isGuest ? (
+            <button
+              onClick={() => navigate('/auth')}
+              className="btn-accent text-sm flex items-center gap-1"
+            >
+              <LogIn size={16} />
+              <span>Giriş Yap</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => signOut()}
+              className="btn-ghost text-sm flex items-center gap-1"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Çıkış</span>
+            </button>
+          )}
+        </div>
       </motion.header>
 
       {avatarError && (
-        <div className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm text-center">
+        <div role="alert" aria-live="assertive" className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-400 text-sm text-center break-anywhere">
           {avatarError}
         </div>
       )}
@@ -285,10 +287,12 @@ export default function HomePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
             onClick={handleContinue}
-            className="btn-accent w-full flex items-center justify-center gap-2 text-lg"
+            className="btn-accent w-full flex items-center justify-center gap-2 text-lg flex-wrap text-center"
           >
-            <Play size={24} />
-            Oyuna Devam Et
+            <span className="flex items-center gap-2">
+              <Play size={24} />
+              Oyuna Devam Et
+            </span>
             <span className="text-sm opacity-80">
               (Soru {breakSession.current_question_number} - {breakSession.current_points} puan)
             </span>

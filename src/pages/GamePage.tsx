@@ -136,7 +136,7 @@ export default function GamePage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <button onClick={() => navigate('/')} className="btn-ghost text-sm flex items-center gap-1">
           <Home size={16} />
           <span className="hidden sm:inline">Ana Sayfa</span>
@@ -197,7 +197,7 @@ export default function GamePage() {
         animate={{ opacity: 1, y: 0 }}
         className="question-card p-6 mb-6"
       >
-        <p className="text-lg sm:text-xl text-cream-100 text-center font-medium leading-relaxed text-balance">
+        <p className="text-lg sm:text-xl text-cream-100 text-center font-medium leading-relaxed text-balance break-anywhere">
           {question.question_text}
         </p>
       </motion.div>
@@ -217,11 +217,16 @@ export default function GamePage() {
 
           return (
             <motion.button
-              key={opt.key}
+              // question.id'yi anahtara dahil etmek, her yeni soruya geçildiğinde
+              // butonun DOM düğümünü tamamen yeniden oluşturur; böylece bir önceki
+              // sorudan kalan hover/focus/active/seçili görsel izi mutlak şekilde
+              // temizlenir (state zaten sıfırlanıyor, bu sadece görsel garantidir).
+              key={`${question.id}-${opt.key}`}
               whileTap={{ scale: 0.98 }}
               disabled={showResult || isEliminated}
               onClick={() => answerQuestion(opt.key)}
               className={className}
+              aria-label={`Seçenek ${opt.key}: ${opt.text}`}
             >
               <div className="flex items-center gap-3">
                 <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
@@ -233,7 +238,7 @@ export default function GamePage() {
                 }`}>
                   {opt.key}
                 </span>
-                <span className="flex-1">{opt.text}</span>
+                <span className="flex-1 break-anywhere">{opt.text}</span>
               </div>
             </motion.button>
           )
@@ -266,7 +271,7 @@ export default function GamePage() {
       )}
 
       {/* Lifelines */}
-      <div className="flex items-center justify-center gap-3 mb-4">
+      <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
         <button
           onClick={useFiftyFifty}
           disabled={session.lifelines_used.fifty_fifty || showResult}
@@ -308,7 +313,7 @@ export default function GamePage() {
                   +{DIFFICULTY_POINTS[currentDifficulty]} puan kazandınız
                 </p>
                 {question.explanation && (
-                  <p className="text-primary-400 text-xs mt-2 italic">{question.explanation}</p>
+                  <p className="text-primary-400 text-xs mt-2 italic break-anywhere">{question.explanation}</p>
                 )}
                 <button
                   onClick={triggerAdvance}
@@ -332,7 +337,7 @@ export default function GamePage() {
                   Doğru cevap: {question.correct_answer}
                 </p>
                 {question.explanation && (
-                  <p className="text-primary-400 text-xs mt-2 italic">{question.explanation}</p>
+                  <p className="text-primary-400 text-xs mt-2 italic break-anywhere">{question.explanation}</p>
                 )}
                 <button
                   onClick={triggerAdvance}
@@ -353,7 +358,7 @@ export default function GamePage() {
       </AnimatePresence>
 
       {/* Bottom Actions */}
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex items-center justify-center gap-3 flex-wrap">
         <button
           onClick={handleBreak}
           disabled={showResult}

@@ -143,9 +143,11 @@ export default function AuthPage() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 flex items-center gap-2 text-error-400 text-sm"
+                role="alert"
+                aria-live="assertive"
+                className="mb-4 p-3 rounded-lg bg-error-500/10 border border-error-500/30 flex items-center gap-2 text-error-400 text-sm break-anywhere"
               >
-                <AlertCircle size={18} />
+                <AlertCircle size={18} className="flex-shrink-0" />
                 <span>{error}</span>
               </motion.div>
             )}
@@ -154,9 +156,11 @@ export default function AuthPage() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-3 rounded-lg bg-success-500/10 border border-success-500/30 flex items-center gap-2 text-success-400 text-sm"
+                role="status"
+                aria-live="polite"
+                className="mb-4 p-3 rounded-lg bg-success-500/10 border border-success-500/30 flex items-center gap-2 text-success-400 text-sm break-anywhere"
               >
-                <CheckCircle2 size={18} />
+                <CheckCircle2 size={18} className="flex-shrink-0" />
                 <span>{success}</span>
               </motion.div>
             )}
@@ -165,15 +169,19 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Kullanıcı Adı</label>
+                <label htmlFor="auth-username" className="block text-sm text-primary-300 mb-1.5">Kullanıcı Adı</label>
                 <div className="relative">
                   <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
                   <input
+                    id="auth-username"
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="input-field pl-10"
                     placeholder="kullaniciadi"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     required
                   />
                 </div>
@@ -182,15 +190,20 @@ export default function AuthPage() {
 
             {mode !== 'reset' && (
               <div>
-                <label className="block text-sm text-primary-300 mb-1.5">E-posta</label>
+                <label htmlFor="auth-email" className="block text-sm text-primary-300 mb-1.5">E-posta</label>
                 <div className="relative">
                   <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
                   <input
+                    id="auth-email"
                     type="email"
+                    inputMode="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="input-field pl-10"
                     placeholder="ornek@email.com"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     required
                   />
                 </div>
@@ -199,21 +212,24 @@ export default function AuthPage() {
 
             {mode !== 'forgot' && mode !== 'reset' && (
               <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Şifre</label>
+                <label htmlFor="auth-password" className="block text-sm text-primary-300 mb-1.5">Şifre</label>
                 <div className="relative">
                   <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
                   <input
+                    id="auth-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="input-field pl-10 pr-10"
                     placeholder="••••••••"
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-200"
+                    aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -223,21 +239,24 @@ export default function AuthPage() {
 
             {mode === 'reset' && (
               <div>
-                <label className="block text-sm text-primary-300 mb-1.5">Yeni Şifre</label>
+                <label htmlFor="auth-new-password" className="block text-sm text-primary-300 mb-1.5">Yeni Şifre</label>
                 <div className="relative">
                   <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
                   <input
+                    id="auth-new-password"
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="input-field pl-10 pr-10"
                     placeholder="En az 6 karakter"
+                    autoComplete="new-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-200"
+                    aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>

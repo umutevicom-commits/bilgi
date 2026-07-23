@@ -233,6 +233,8 @@ export default function LeaderboardPage() {
                   <img
                     src={entry.avatar_url}
                     alt={entry.username}
+                    loading="lazy"
+                    decoding="async"
                     className={`w-10 h-10 rounded-full object-cover ${
                       entry.is_online ? 'avatar-glow-online' : 'avatar-glow'
                     }`}

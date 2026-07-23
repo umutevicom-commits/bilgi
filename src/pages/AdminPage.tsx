@@ -153,7 +153,7 @@ export default function AdminPage() {
             <div key={u.id} className="glass-card p-3 flex items-center gap-3">
               <div className="relative flex-shrink-0">
                 {u.avatar_url ? (
-                  <img src={u.avatar_url} alt={u.username} className={`w-10 h-10 rounded-full object-cover ${u.is_online ? 'avatar-glow-online' : 'avatar-glow'}`} />
+                  <img src={u.avatar_url} alt={u.username} loading="lazy" decoding="async" className={`w-10 h-10 rounded-full object-cover ${u.is_online ? 'avatar-glow-online' : 'avatar-glow'}`} />
                 ) : (
                   <div className={`w-10 h-10 rounded-full bg-primary-700 flex items-center justify-center ${u.is_online ? 'avatar-glow-online' : 'avatar-glow'}`}>
                     <span className="text-primary-200 font-bold text-sm">{u.username.charAt(0).toUpperCase()}</span>
