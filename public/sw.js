@@ -1,7 +1,7 @@
 const CACHE_NAME = 'bilgi-yarismasi-v5';
 // Vite build "base" ayarı ('/bilgi/') ile eşleşmeli, aksi halde GitHub Pages
 // alt dizininde önbellek asla isabet etmez ve offline destek çalışmaz.
-const BASE = '/';
+const BASE = '/bilgi/';
 const STATIC_ASSETS = [BASE, `${BASE}index.html`, `${BASE}manifest.json`, `${BASE}favicon.svg`];
 
 self.addEventListener('install', (event) => {
