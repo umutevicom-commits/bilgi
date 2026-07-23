@@ -149,7 +149,7 @@ export default function HomePage() {
     if (profile.gender === 'female') {
       return <span className="badge-queen">Kraliçe</span>
     }
-    return <span className="badge-king">Kral</span>
+    return <span className="badge-king">Üye</span>
   }
 
   const getStars = () => {
