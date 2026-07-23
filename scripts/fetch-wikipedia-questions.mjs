@@ -328,8 +328,18 @@ const DIFFICULTY_PROFILE = {
 // ============================================
 // YARDIMCI FONKSİYONLAR
 // ============================================
+// Fisher-Yates: her permütasyonun eşit olasılıkla çıkmasını garanti eden
+// tek doğru karıştırma algoritması. Eski `sort(() => Math.random()-0.5)`
+// yöntemi istatistiksel olarak hafif taraflıydı (bazı sıralamalar diğerlerinden
+// daha sık çıkar); doğru şıkkın A/B/C/D arasında tam eşit dağılması için
+// bu kanıtlanmış doğru algoritma kullanılır.
 function shuffle(arr) {
-  return [...arr].sort(() => Math.random() - 0.5)
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 function pickN(arr, n) {
@@ -371,9 +381,22 @@ function cleanSentence(raw) {
   let text = raw
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/\/[^/]*\//g, ' ')
+    // Sadece IPA telaffuz bloklarını hedefler (rakam içermeyen, kısa /.../ öbekleri).
+    // Eski kural rakam/URL/oran içeren her /.../ bloğunu (örn. "3/4", "km/sa") de
+    // silip cümleyi bozabiliyordu; artık yalnızca gerçek telaffuz işaretleri temizlenir.
+    .replace(/\/[^/\d]{2,40}\//g, ' ')
+    // Üç nokta / Unicode elipsis (…) ve 2+ art arda nokta: bunlar Wikipedia
+    // özetlerinde "kesilmiş / devamı var" anlamına gelir. Şıklarda veya
+    // sorularda ASLA görünmemeli — burada tamamen kaldırılır, cümle daha
+    // sonra uzunluk ve tamlık kontrolünden geçerek ya kabul ya da reddedilir.
+    .replace(/…/g, ' ')
+    .replace(/\.{2,}/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:])/g, '$1')
+    // Cümle ortasında kalan yalnız virgül/tire gibi artık bağlaç kırıntılarını temizler
+    .replace(/,\s*\./g, '.')
+    .replace(/^[,;:\-–—\s]+/, '')
+    .replace(/[,;:\-–—\s]+$/, '')
     .trim()
 
   if (text && !/[.!?]$/.test(text)) {
@@ -382,22 +405,32 @@ function cleanSentence(raw) {
   return text
 }
 
+// Elipsis temizlendikten sonra dahi metnin "yarım kalmış" görünmesine yol
+// açabilecek kalıpları (art arda virgül, tek başına bağlaç ile biten metin
+// vb.) yakalar. Böyle bir aday şık/cevap olarak ASLA kullanılmaz.
+const DANGLING_FRAGMENT_REGEX = /(,\s*$|:\s*$|-\s*$|\bve\s*\.$|\bile\s*\.$|\bveya\s*\.$)/i
+
 // Metin ASLA '…' ile kesilerek bozulmaz: belirtilen sınıra sığmayan aday
 // tamamen reddedilir (null döner), üretim akışı bunun yerine başka bir
 // cümle/konu dener. Bu sayede ekranda gösterilen her soru ve şık HER ZAMAN
 // eksiksiz, baştan sona doğru bir metindir.
 function fitsLimit(text, maxLen) {
-  return typeof text === 'string' && text.trim().length > 0 && text.length <= maxLen
+  if (typeof text !== 'string') return false
+  const trimmed = text.trim()
+  if (trimmed.length === 0 || trimmed.length > maxLen) return false
+  if (DANGLING_FRAGMENT_REGEX.test(trimmed)) return false
+  return true
 }
 
-// Wikipedia extract metnini cümlelere böler.
+// Wikipedia extract metnini cümlelere böler. Kısa/uzun ve yarım kalmış
+// cümleler burada elenir; sonuç her zaman kısa, net ve tam cümlelerdir.
 function splitSentences(extract) {
   if (!extract) return []
   return extract
     .replace(/\n+/g, ' ')
     .split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/)
     .map((s) => cleanSentence(s))
-    .filter((s) => s.length >= 25 && s.length <= 260)
+    .filter((s) => s.length >= 25 && s.length <= 190 && !DANGLING_FRAGMENT_REGEX.test(s))
 }
 
 const YEAR_ONLY_REGEX = /^\d{3,4}$/
@@ -407,7 +440,34 @@ function isUsableOption(text) {
   // Yıl bazlı sorularda doğru/yanlış şıklar "1923" gibi kısa sayılardır,
   // normal cümle şıklarından farklı bir uzunluk kuralına tabidir.
   if (YEAR_ONLY_REGEX.test(text)) return true
-  return text.length >= 8 && text.length <= 160
+  if (DANGLING_FRAGMENT_REGEX.test(text)) return false
+  // Kısa, net, tek bakışta anlaşılır şıklar: çok uzun/karmaşık cümleler
+  // oyuncunun şıkları hızlıca ayırt etmesini zorlaştırır.
+  return text.length >= 12 && text.length <= 130
+}
+
+// İki metin normalize edilmiş kelime kümesi bazında çok benzer mi?
+// (Yanlış şıkların doğru cevaba veya birbirine neredeyse aynı görünmesini
+// engeller — böylece her şık net ve birbirinden ayırt edilebilir kalır.)
+function normalizeForCompare(text) {
+  return text
+    .toLowerCase('tr-TR')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isTooSimilar(a, b) {
+  const na = normalizeForCompare(a)
+  const nb = normalizeForCompare(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const wa = new Set(na.split(' '))
+  const wb = new Set(nb.split(' '))
+  let common = 0
+  for (const w of wa) if (wb.has(w)) common++
+  const union = new Set([...wa, ...wb]).size
+  return union > 0 && common / union >= 0.7
 }
 
 async function fetchSummary(title) {
@@ -468,17 +528,22 @@ function letterFor(index) {
 }
 
 function buildQuestionRecord({ category, difficulty, questionText, correctText, wrongTexts, explanation, sourceUrl, sourceTitle }) {
-  if (!fitsLimit(questionText, 220)) return null
+  if (!fitsLimit(questionText, 200)) return null
   if (!isUsableOption(correctText)) return null
   const validWrongs = wrongTexts.filter(isUsableOption)
   if (validWrongs.length < 3) return null
 
-  // Aynı metnin yanlış şık olarak iki kez görünmesini engelle
+  // Aynı metnin yanlış şık olarak iki kez görünmesini VE herhangi bir şıkkın
+  // doğru cevaba ya da başka bir şıkka neredeyse aynı görünmesini engelle.
+  // Bu sayede oyuncunun karşısına HER ZAMAN dört net, birbirinden tamamen
+  // ayırt edilebilir şık çıkar.
   const uniqueWrongs = []
   const seen = new Set([correctText.toLowerCase()])
   for (const w of validWrongs) {
     const key = w.toLowerCase()
     if (seen.has(key)) continue
+    if (isTooSimilar(w, correctText)) continue
+    if (uniqueWrongs.some((existing) => isTooSimilar(existing, w))) continue
     seen.add(key)
     uniqueWrongs.push(w)
     if (uniqueWrongs.length === 3) break
