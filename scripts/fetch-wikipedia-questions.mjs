@@ -4,11 +4,33 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const QUESTIONS_FILE = join(__dirname, '..', 'public', 'data', 'questions.json')
+// Hangi Wikipedia maddelerinin hangi kategori için "işlendiğini" kalıcı olarak
+// tutar. Bu dosya olmadan her cron aynı ~4 konuyu tekrar tekrar seçip aynı
+// soruları (farklı şık sırasıyla) üretmeye devam ederdi.
+const USED_TITLES_FILE = join(__dirname, '..', 'public', 'data', 'used-titles.json')
 
 const USER_AGENT = 'BilgiYarismasiBot/4.0 (educational quiz generator; contact@example.com)'
 const WIKI_API = 'https://tr.wikipedia.org/api/rest_v1/page/summary/'
 const WIKI_SEARCH_API = 'https://tr.wikipedia.org/w/api.php'
 const WIKI_RANDOM_API = 'https://tr.wikipedia.org/api/rest_v1/page/random/summary'
+
+// ============================================
+// ÇALIŞTIRMA AYARLARI (env değişkeni ile ezilebilir)
+// ============================================
+// Bir cron çalışmasında üretilmesi HEDEFLENEN yeni soru sayısı. "Binlerce"
+// istendiği için varsayılanı yüksek tuttuk, ama Wikipedia'ya nazik davranmak
+// için eş zamanlılık (concurrency) ile dengeliyoruz. Gerekirse workflow
+// dosyasından env ile küçültüp büyütebilirsin.
+const TARGET_NEW_QUESTIONS = parseInt(process.env.TARGET_NEW_QUESTIONS || '2000', 10)
+// Aynı anda kaç Wikipedia isteği açık kalsın. Çok yüksek tutma; Wikipedia
+// User-Agent bazlı hız sınırlaması / geçici IP engeli uygulayabilir.
+const FETCH_CONCURRENCY = parseInt(process.env.FETCH_CONCURRENCY || '8', 10)
+// Her kategori için bu run'da işlenecek MAKSİMUM konu (madde) sayısı.
+// Sabit listedeki konular tükenince otomatik olarak Wikipedia arama API'siyle
+// ilişkili yeni başlıklar keşfedilir (bkz. expandTopicFrontier).
+const MAX_TOPICS_PER_CATEGORY = parseInt(process.env.MAX_TOPICS_PER_CATEGORY || '260', 10)
+// "karisik" kategorisi için rastgele madde sayısı.
+const RANDOM_ARTICLE_COUNT = parseInt(process.env.RANDOM_ARTICLE_COUNT || '260', 10)
 
 // ============================================
 // KATEGORİ / KONU HAVUZU
@@ -492,7 +514,7 @@ function generateYearQuestion({ article, sentences, difficulty, category }) {
   })
 }
 
-async function generateQuestionForTopic(topic, difficulty, category, seenTexts) {
+async function generateQuestionForTopic(topic, difficulty, category, seenTexts, sourceIndex) {
   const profile = DIFFICULTY_PROFILE[difficulty]
   let article = await fetchSummary(topic)
   if (!article) return null
@@ -539,10 +561,13 @@ async function generateQuestionForTopic(topic, difficulty, category, seenTexts) 
 
   if (!question) return null
 
-  const dedupeKey = `${question.category}|${question.question_text}|${question.option_a}`.toLowerCase()
-  if (seenTexts.has(dedupeKey)) return null
-  seenTexts.add(dedupeKey)
+  // 1) Tam tekrar kontrolü (şık sırasından bağımsız, düzeltilmiş imza)
+  if (seenTexts.has(questionSignature(question))) return null
+  // 2) Aynı kaynak maddeden üretilmiş, farklı kelimelerle de olsa aynı
+  //    olguyu soran BENZER soru kontrolü
+  if (isNearDuplicate(question, sourceIndex)) return null
 
+  registerQuestion(question, seenTexts, sourceIndex)
   return question
 }
 
@@ -578,13 +603,166 @@ function saveQuestions(questions) {
   writeFileSync(QUESTIONS_FILE, JSON.stringify(output, null, 2), 'utf-8')
 }
 
+// ÖNEMLİ DÜZELTME: Eski imza `category|question_text|option_a` idi. option_a,
+// şıklar her üretimde karıştırıldığı (shuffle) için RASTGELE bir konumdaydı.
+// Yani aynı soru + aynı 4 şık, sadece sırası farklıyken imza değişiyor ve
+// dedup bunu YAKALAYAMIYORDU (canlı örnek: "Yalova hakkında..." sorusu 5 kez
+// üretilmiş, 2 tanesi harfi harfine aynı şıklara sahipti). Düzeltme: şıkları
+// normalize edip ALFABETİK SIRALA, konum artık imzayı etkilemesin.
+function questionSignature(q) {
+  const normText = normalizeForCompare(q.question_text)
+  const opts = [q.option_a, q.option_b, q.option_c, q.option_d]
+    .map(normalizeForCompare)
+    .sort()
+  return `${q.category}|${normText}|${opts.join('~')}`
+}
+
 function buildDedupeSet(existingQuestions) {
   const seen = new Set()
   for (const q of existingQuestions) {
-    const key = `${q.category}|${q.question_text}|${q.option_a}`.toLowerCase()
-    seen.add(key)
+    seen.add(questionSignature(q))
   }
   return seen
+}
+
+// Aynı Wikipedia maddesinden üretilen sorular arasında, şablon metni farklı
+// olsa bile (ör. "X hakkında doğru bilgi" vs "X ile ilgili doğru ifade") aynı
+// olguyu (aynı doğru cevabı) soran BENZER sorular oluşabilir. Bunu yakalamak
+// için karşılaştırmayı sadece "aynı kategori + aynı kaynak madde" grubuyla
+// sınırlı tutuyoruz (performans için — binlerce soruya karşı tek tek
+// kıyaslamak yerine küçük gruplara bakıyoruz).
+function correctAnswerText(q) {
+  return { A: q.option_a, B: q.option_b, C: q.option_c, D: q.option_d }[q.correct_answer] || ''
+}
+
+function buildSourceIndex(existingQuestions) {
+  const idx = new Map()
+  for (const q of existingQuestions) {
+    const key = `${q.category}|${(q.source_title || '').toLowerCase()}`
+    if (!idx.has(key)) idx.set(key, [])
+    idx.get(key).push(q)
+  }
+  return idx
+}
+
+function isNearDuplicate(candidate, sourceIndex) {
+  const key = `${candidate.category}|${(candidate.source_title || '').toLowerCase()}`
+  const group = sourceIndex.get(key)
+  if (!group || group.length === 0) return false
+  const candCorrect = correctAnswerText(candidate)
+  for (const existing of group) {
+    if (isTooSimilar(candidate.question_text, existing.question_text)) return true
+    if (candCorrect && isTooSimilar(candCorrect, correctAnswerText(existing))) return true
+  }
+  return false
+}
+
+function registerQuestion(q, seenTexts, sourceIndex) {
+  seenTexts.add(questionSignature(q))
+  const key = `${q.category}|${(q.source_title || '').toLowerCase()}`
+  if (!sourceIndex.has(key)) sourceIndex.set(key, [])
+  sourceIndex.get(key).push(q)
+}
+
+// ============================================
+// "İŞLENMİŞ BAŞLIK" HAFIZASI (kalıcı, çalışmalar arası)
+// ============================================
+// Her kategori için hangi Wikipedia maddelerinin daha önce soru üretmek üzere
+// kullanıldığını saklar. Bu olmadan sabit konu listesi (ör. 70-300 madde)
+// hızla tükenir ve her cron aynı birkaç maddeyi tekrar tekrar seçmeye devam
+// eder — tekrar eden soruların asıl kök nedeni budur.
+function loadUsedTitles() {
+  try {
+    if (!existsSync(USED_TITLES_FILE)) return {}
+    const data = JSON.parse(readFileSync(USED_TITLES_FILE, 'utf-8'))
+    const out = {}
+    for (const [k, v] of Object.entries(data)) out[k] = new Set(v)
+    return out
+  } catch (err) {
+    console.warn('used-titles.json okunamadı, sıfırdan başlanıyor:', err.message)
+    return {}
+  }
+}
+
+function saveUsedTitles(usedMap) {
+  const plain = {}
+  for (const [k, set] of Object.entries(usedMap)) plain[k] = Array.from(set)
+  const dir = dirname(USED_TITLES_FILE)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  writeFileSync(USED_TITLES_FILE, JSON.stringify(plain), 'utf-8')
+}
+
+function getUsedSet(usedMap, key) {
+  if (!usedMap[key]) usedMap[key] = new Set()
+  return usedMap[key]
+}
+
+// ============================================
+// KONU CEPHESİ GENİŞLETME (sabit liste tükendiğinde)
+// ============================================
+// Sabit CATEGORIES.topics listesi başlangıç ("tohum") noktasıdır. Bir kategori
+// için daha önce kullanılmamış N madde gerektiğinde, önce tohum listesinden
+// kullanılmamışları alır; yetmezse Wikipedia arama API'si üzerinden tohum
+// konularla ilişkili yeni başlıklar keşfederek (BFS) listeyi otomatik
+// genişletir. Böylece havuz, elle liste büyütmeden de sürekli büyüyebilir.
+async function expandTopicFrontier(seedTopics, usedSet, want) {
+  const picked = []
+  const localSeen = new Set()
+
+  const freshSeeds = shuffle(seedTopics).filter((t) => !usedSet.has(t))
+  for (const t of freshSeeds) {
+    if (picked.length >= want) break
+    if (localSeen.has(t)) continue
+    localSeen.add(t)
+    picked.push(t)
+  }
+  if (picked.length >= want) return picked
+
+  // Tohumlar tükendi: ilişkili başlıklarla BFS genişletmesi yap.
+  const queue = shuffle(seedTopics)
+  let qi = 0
+  let guard = 0
+  while (picked.length < want && qi < queue.length && guard < want * 3) {
+    const t = queue[qi++]
+    guard++
+    try {
+      const related = await fetchRelatedTitles(t, 12)
+      for (const r of related) {
+        if (picked.length >= want) break
+        if (localSeen.has(r) || usedSet.has(r)) continue
+        localSeen.add(r)
+        picked.push(r)
+        queue.push(r) // ikinci derece komşulardan da beslenebilelim
+      }
+    } catch {
+      // tek bir arama başarısız olursa akışı bozma, devam et
+    }
+  }
+  return picked
+}
+
+// ============================================
+// EŞ ZAMANLI ÇALIŞMA HAVUZU
+// ============================================
+// Binlerce madde tek tek (sıralı) işlenirse run çok uzun sürer. Basit bir
+// eşzamanlılık havuzu ile Wikipedia'yı makul ölçüde paralel sorguluyoruz
+// (varsayılan 8 eşzamanlı istek — çok yükseltme, engellenme riski artar).
+async function runPool(items, worker, concurrency) {
+  const results = []
+  let idx = 0
+  async function lane() {
+    while (idx < items.length) {
+      const my = idx++
+      try {
+        results[my] = await worker(items[my], my)
+      } catch {
+        results[my] = null
+      }
+    }
+  }
+  const lanes = Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, lane)
+  await Promise.all(lanes)
+  return results
 }
 
 // ============================================
@@ -595,113 +773,165 @@ async function run() {
   console.log('═══════════════════════════════════════════════')
   console.log('  Soru Havuzu Güncelleme — Wikipedia Kaynaklı')
   console.log('  Sorular JSON olarak GitHub Pages üzerinde saklanır')
+  console.log(`  Hedef: ~${TARGET_NEW_QUESTIONS} yeni soru | eşzamanlılık: ${FETCH_CONCURRENCY}`)
   console.log('═══════════════════════════════════════════════')
 
-  // Mevcut soru havuzunu yükle
   const existingQuestions = loadExistingQuestions()
   console.log(`Mevcut soru havuzu: ${existingQuestions.length} soru`)
 
-  // Dedup kümesi oluştur
+  // Dedup + benzer-soru kontrolü için indeksler (bkz. yukarıdaki açıklamalar)
   const seenTexts = buildDedupeSet(existingQuestions)
+  const sourceIndex = buildSourceIndex(existingQuestions)
   console.log(`Dedup için ${seenTexts.size} soru imzası yüklendi.`)
+
+  // Kalıcı "işlenmiş madde" hafızası: aynı maddeyi bir kategori için
+  // tekrar tekrar seçip aynı soruları üretmeyi engeller.
+  const usedTitles = loadUsedTitles()
 
   const newQuestions = []
   const stats = {}
+  // Her kategoriye ayrılan hedef, toplam hedefe orantılı paylaştırılır
+  // (karisik kategorisi kendi ayrı payını alır).
+  const perCategoryTarget = Math.max(
+    20,
+    Math.floor((TARGET_NEW_QUESTIONS * 0.75) / CATEGORIES.length)
+  )
 
   for (const cat of CATEGORIES) {
+    if (newQuestions.length >= TARGET_NEW_QUESTIONS) break
     stats[cat.slug] = 0
-    console.log(`\n▶ Kategori: ${cat.slug}`)
-    const topics = pickN(cat.topics, Math.min(cat.topics.length, 4))
+    console.log(`\n▶ Kategori: ${cat.slug} (hedef ~${perCategoryTarget} soru)`)
 
+    const usedSet = getUsedSet(usedTitles, cat.slug)
+    const topics = await expandTopicFrontier(
+      cat.topics,
+      usedSet,
+      Math.min(MAX_TOPICS_PER_CATEGORY, cat.topics.length + MAX_TOPICS_PER_CATEGORY)
+    )
+    console.log(`  ${topics.length} (daha önce kullanılmamış) madde bulundu.`)
+
+    // Her madde için (konu × zorluk) iş birimleri oluştur, eşzamanlı işle
+    const jobs = []
     for (const topic of topics) {
       for (const difficulty of DIFFICULTIES) {
-        const count = Math.random() > 0.5 ? 2 : 1
-        for (let i = 0; i < count; i++) {
-          try {
-            const q = await generateQuestionForTopic(topic, difficulty, cat.slug, seenTexts)
-            if (q) {
-              newQuestions.push(q)
-              stats[cat.slug]++
-            }
-          } catch (err) {
-            console.warn(`  ! "${topic}" (${difficulty}) üretilirken hata: ${err.message}`)
-          }
-          await sleep(150)
-        }
+        jobs.push({ topic, difficulty })
       }
     }
+
+    await runPool(
+      jobs,
+      async ({ topic, difficulty }) => {
+        if (newQuestions.length >= TARGET_NEW_QUESTIONS + perCategoryTarget) return null
+        try {
+          const q = await generateQuestionForTopic(topic, difficulty, cat.slug, seenTexts, sourceIndex)
+          if (q) {
+            newQuestions.push(q)
+            stats[cat.slug]++
+          }
+        } catch (err) {
+          console.warn(`  ! "${topic}" (${difficulty}) üretilirken hata: ${err.message}`)
+        }
+        return null
+      },
+      FETCH_CONCURRENCY
+    )
+
+    // Bu run'da denenen tüm maddeleri (soru üretsin/üretmesin) "kullanılmış"
+    // olarak işaretle ki bir sonraki cron farklı maddelere geçsin.
+    for (const t of topics) usedSet.add(t)
+
     console.log(`  ✓ ${cat.slug}: ${stats[cat.slug]} yeni soru`)
   }
 
   // "karisik" kategorisi için rastgele makale taraması
-  console.log('\n▶ Kategori: karisik (rastgele tarama)')
+  console.log(`\n▶ Kategori: karisik (rastgele tarama, hedef ~${RANDOM_ARTICLE_COUNT} madde)`)
   stats['karisik'] = 0
-  const RANDOM_ARTICLE_COUNT = 20
+  const randomUsedSet = getUsedSet(usedTitles, '__random__')
 
-  for (let i = 0; i < RANDOM_ARTICLE_COUNT; i++) {
-    try {
-      let article = await fetchRandomArticle()
-      if (!article?.extract) continue
+  // Rastgele maddeleri önce topluca çek (aynı anda birden fazla istek),
+  // sonra her biri için soru üretmeye çalış.
+  const randomArticles = []
+  await runPool(
+    Array.from({ length: RANDOM_ARTICLE_COUNT }),
+    async () => {
+      const article = await fetchRandomArticle()
+      if (article?.title && !randomUsedSet.has(article.title)) {
+        randomArticles.push(article)
+      }
+      return null
+    },
+    FETCH_CONCURRENCY
+  )
+  console.log(`  ${randomArticles.length} yeni (daha önce görülmemiş) rastgele madde alındı.`)
 
-      if (Math.random() < 0.4) {
-        const related = await fetchRelatedTitles(article.title, 8)
-        if (related.length > 0) {
-          const deeper = await fetchSummary(related[Math.floor(Math.random() * related.length)])
-          if (deeper) article = deeper
+  await runPool(
+    randomArticles,
+    async (article) => {
+      try {
+        randomUsedSet.add(article.title)
+        if (!article?.extract) return null
+
+        let art = article
+        if (Math.random() < 0.4) {
+          const related = await fetchRelatedTitles(art.title, 8)
+          if (related.length > 0) {
+            const deeper = await fetchSummary(related[Math.floor(Math.random() * related.length)])
+            if (deeper) art = deeper
+          }
         }
-      }
 
-      const sentences = splitSentences(article.extract)
-      if (sentences.length === 0) continue
+        const sentences = splitSentences(art.extract)
+        if (sentences.length === 0) return null
 
-      const relatedTitles = await fetchRelatedTitles(article.title, 10)
-      const distractorSummaries = []
-      for (const t of pickN(relatedTitles, Math.min(relatedTitles.length, 5))) {
-        const summary = await fetchSummary(t)
-        if (summary?.extract) {
-          const s = splitSentences(summary.extract)
-          if (s.length > 0) distractorSummaries.push(s[0])
+        const relatedTitles = await fetchRelatedTitles(art.title, 10)
+        const distractorSummaries = []
+        for (const t of pickN(relatedTitles, Math.min(relatedTitles.length, 5))) {
+          const summary = await fetchSummary(t)
+          if (summary?.extract) {
+            const s = splitSentences(summary.extract)
+            if (s.length > 0) distractorSummaries.push(s[0])
+          }
         }
-        await sleep(100)
-      }
-      if (distractorSummaries.length < 3) continue
+        if (distractorSummaries.length < 3) return null
 
-      const difficulty = DIFFICULTIES[Math.floor(Math.random() * DIFFICULTIES.length)]
+        const difficulty = DIFFICULTIES[Math.floor(Math.random() * DIFFICULTIES.length)]
 
-      let q = null
-      if (Math.random() < 0.3) {
-        q = generateYearQuestion({ article, sentences, difficulty, category: 'karisik' })
-      }
-      if (!q) {
-        q = generateDefinitionQuestion({
-          article,
-          sentences,
-          distractorSentences: distractorSummaries,
-          difficulty,
-          category: 'karisik',
-        })
-      }
+        let q = null
+        if (Math.random() < 0.3) {
+          q = generateYearQuestion({ article: art, sentences, difficulty, category: 'karisik' })
+        }
+        if (!q) {
+          q = generateDefinitionQuestion({
+            article: art,
+            sentences,
+            distractorSentences: distractorSummaries,
+            difficulty,
+            category: 'karisik',
+          })
+        }
 
-      if (q) {
-        const dedupeKey = `${q.category}|${q.question_text}|${q.option_a}`.toLowerCase()
-        if (!seenTexts.has(dedupeKey)) {
-          seenTexts.add(dedupeKey)
+        if (q) {
+          if (seenTexts.has(questionSignature(q))) return null
+          if (isNearDuplicate(q, sourceIndex)) return null
+          registerQuestion(q, seenTexts, sourceIndex)
           newQuestions.push(q)
           stats['karisik']++
         }
+      } catch (err) {
+        console.warn(`  ! Rastgele madde işlenirken hata: ${err.message}`)
       }
-    } catch (err) {
-      console.warn(`  ! Rastgele madde işlenirken hata: ${err.message}`)
-    }
-    await sleep(150)
-  }
+      return null
+    },
+    FETCH_CONCURRENCY
+  )
   console.log(`  ✓ karisik: ${stats['karisik']} yeni soru`)
 
   // ============================================
-  // JSON DOSYASINA YAZMA (incremental merge)
+  // JSON DOSYASINA YAZMA (incremental merge) + hafızayı kaydet
   // ============================================
   const allQuestions = [...existingQuestions, ...newQuestions]
   saveQuestions(allQuestions)
+  saveUsedTitles(usedTitles)
 
   const durationSec = ((Date.now() - startedAt) / 1000).toFixed(1)
   console.log('\n═══════════════════════════════════════════════')
