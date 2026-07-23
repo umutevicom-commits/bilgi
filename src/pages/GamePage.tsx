@@ -6,11 +6,24 @@ import { AdBanner } from '../components/AdBanner'
 import { BorderBeam } from '../components/BorderBeam'
 import { playTick, playTimeUp } from '../lib/sound'
 import { vibrateTick, vibrateTimeUp } from '../lib/haptics'
+import {
+  primeVoice, isVoiceEnabled, setVoiceEnabled,
+  announceQuestion, announceUrgent, announceCorrect, announceWrong, announceTimeout,
+  announceGameEnd, stopSpeaking,
+} from '../lib/voiceAnnouncer'
 import { DIFFICULTY_LABELS, DIFFICULTY_POINTS, DIFFICULTY_COLORS } from '../types'
+import type { Question } from '../types'
 import {
   Home, Coffee, Trophy, X, Users, Phone, Lightbulb,
-  ChevronRight, AlertCircle, Clock,
+  ChevronRight, AlertCircle, Clock, Volume2, VolumeX,
 } from 'lucide-react'
+
+// Bir sorunun doğru cevap metnini, render'da kullanılan `options` dizisini
+// beklemeden (hook sırası bozulmasın diye early return'lerden ÖNCE) okumak
+// için küçük bir yardımcı.
+function getOptionTextByKey(q: Question, key: 'A' | 'B' | 'C' | 'D'): string {
+  return { A: q.option_a, B: q.option_b, C: q.option_c, D: q.option_d }[key] || ''
+}
 
 // Doğru cevaptan sonra kaç saniye içinde bir sonraki soruya otomatik geçilecek
 const AUTO_ADVANCE_SECONDS_CORRECT = 3
@@ -29,6 +42,13 @@ export default function GamePage() {
   const [showEndModal, setShowEndModal] = useState(false)
   const [autoAdvanceIn, setAutoAdvanceIn] = useState<number | null>(null)
   const advancingRef = useRef(false)
+  const [voiceOn, setVoiceOn] = useState(() => isVoiceEnabled())
+
+  const toggleVoice = () => {
+    const next = !voiceOn
+    setVoiceEnabled(next)
+    setVoiceOn(next)
+  }
 
   const {
     session, question, timeLeft, selectedAnswer, showResult, isCorrect,
@@ -129,6 +149,68 @@ export default function GamePage() {
     }
   }, [showResult, selectedAnswer, question])
 
+  // İlk kullanıcı etkileşiminde (Ara Ver / Çekil / şık tıklama vb.) sesin
+  // tarayıcı tarafından kilitlenmemesi için sesli motoru "ısıtıyoruz".
+  useEffect(() => {
+    primeVoice()
+  }, [])
+
+  // Yeni soru geldiğinde: soruyu ve ardından A/B/C/D şıklarını sırayla oku.
+  // Aynı soru için (showResult açılıp kapansa bile) yalnızca BİR kez okunur.
+  const announcedQuestionIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading || showResult || !question) return
+    if (announcedQuestionIdRef.current === question.id) return
+    announcedQuestionIdRef.current = question.id
+    announceQuestion(question.question_text, [
+      question.option_a, question.option_b, question.option_c, question.option_d,
+    ])
+  }, [loading, showResult, question])
+
+  // Süre azaldıkça akıllıca yorum yapsın: sadece 10. ve 5. saniyede (her
+  // saniye konuşursa soru okumasıyla üst üste biner, rahatsız edici olur).
+  const urgentAnnouncedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading || showResult || !question) return
+    const key = `${question.id}-${timeLeft}`
+    if ((timeLeft === 10 || timeLeft === 5) && urgentAnnouncedForRef.current !== key) {
+      urgentAnnouncedForRef.current = key
+      announceUrgent(timeLeft)
+    }
+  }, [timeLeft, showResult, loading, question])
+
+  // Sonuç belli olduğunda: doğruysa seriye göre tebrik, yanlışsa/süre
+  // dolduysa üzülüp doğru cevabı söylesin. Her sonuç için tek sefer.
+  const resultAnnouncedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showResult || !question) return
+    const key = `${question.id}-${selectedAnswer}`
+    if (resultAnnouncedForRef.current === key) return
+    resultAnnouncedForRef.current = key
+
+    if (isCorrect) {
+      announceCorrect(streak, DIFFICULTY_POINTS[currentDifficulty])
+    } else {
+      const correctText = getOptionTextByKey(question, question.correct_answer)
+      if (selectedAnswer === 'timeout') announceTimeout(correctText)
+      else announceWrong(correctText)
+    }
+  }, [showResult, question, selectedAnswer, isCorrect, streak, currentDifficulty])
+
+  // Oyun bittiğinde (modal açıldığında) skora göre genel bir değerlendirme.
+  const gameEndAnnouncedRef = useRef(false)
+  useEffect(() => {
+    if (!showEndModal || !session) return
+    if (gameEndAnnouncedRef.current) return
+    gameEndAnnouncedRef.current = true
+    announceGameEnd(session.current_points, session.current_question_number)
+  }, [showEndModal, session])
+
+  // Sayfadan ayrılırken okuma devam etmesin.
+  useEffect(() => {
+    return () => stopSpeaking()
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -180,10 +262,20 @@ export default function GamePage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-        <button onClick={() => navigate('/')} className="btn-ghost text-sm flex items-center gap-1">
-          <Home size={16} />
-          <span className="hidden sm:inline">Ana Sayfa</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/')} className="btn-ghost text-sm flex items-center gap-1">
+            <Home size={16} />
+            <span className="hidden sm:inline">Ana Sayfa</span>
+          </button>
+          <button
+            onClick={toggleVoice}
+            className="btn-ghost text-sm flex items-center gap-1"
+            title={voiceOn ? 'Sesli anlatımı kapat' : 'Sesli anlatımı aç'}
+            aria-pressed={voiceOn}
+          >
+            {voiceOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <div className="glass-card px-3 py-1.5 flex items-center gap-2">
             <Trophy size={16} className="text-accent-400" />

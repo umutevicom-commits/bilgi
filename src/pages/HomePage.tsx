@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { AdBanner } from '../components/AdBanner'
 import { BorderBeam } from '../components/BorderBeam'
 import { AppLogo } from '../components/AppLogo'
+import { primeVoice } from '../lib/voiceAnnouncer'
 import type { GameSession, Category } from '../types'
 import {
   Play, Trophy, LogOut, LogIn, User, Crown, Star, Zap, BookOpen, Globe,
@@ -117,6 +118,7 @@ export default function HomePage() {
   }, [])
 
   const handleStartGame = () => {
+    primeVoice()
     if (isGuest) {
       navigate('/auth')
       return
@@ -130,6 +132,7 @@ export default function HomePage() {
   }
 
   const handleCategorySelect = (slug: string) => {
+    primeVoice()
     if (isGuest) {
       navigate('/auth')
       return
