@@ -312,16 +312,6 @@
     background-size: 1000px 100%;
     animation: shimmer 2s linear infinite;
   }
-
-  /* Oturum bilgisi (Supabase session) yüklenirken gösterilen iskelet
-     (skeleton) blok. Gerçek içerikle aynı boyut/yerleşimi taklit ederek
-     "Misafir" yazısının bir anlığına görünüp gerçek kullanıcı adıyla
-     değişmesi (flash) ve buna bağlı gölge/parıltı sıçramasını önler. */
-  .skeleton-block {
-    background: rgba(168, 189, 212, 0.12);
-    border-radius: 0.5rem;
-    animation: skeletonShimmer 1.6s ease-in-out infinite;
-  }
 }
 
 @layer utilities {
