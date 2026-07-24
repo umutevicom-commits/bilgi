@@ -303,7 +303,7 @@ export default function HomePage() {
         className="text-center mb-8"
       >
         <div className="relative inline-block rounded-2xl px-6 py-2 glass-card">
-          <h1 className="text-4xl sm:text-5xl font-bold text-cream-100 text-balance">
+          <h1 className="text-4xl sm:text-5xl font-bold text-foil text-balance tracking-tight">
             Bilgi Yarışması
           </h1>
           <BorderBeam size={100} duration={6.5} borderWidth={1.5} colorFrom="#f9cb72" colorTo="#4d7aa8" />
@@ -402,15 +402,15 @@ export default function HomePage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-accent-400">{profile?.total_points || 0}</div>
+          <div className="text-2xl font-bold text-accent-400 tabular-nums">{profile?.total_points || 0}</div>
           <div className="text-xs text-primary-300 mt-1">Toplam Puan</div>
         </div>
         <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-success-400">{profile?.best_score || 0}</div>
+          <div className="text-2xl font-bold text-success-400 tabular-nums">{profile?.best_score || 0}</div>
           <div className="text-xs text-primary-300 mt-1">En İyi Skor</div>
         </div>
         <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-primary-300">{profile?.games_played || 0}</div>
+          <div className="text-2xl font-bold text-primary-300 tabular-nums">{profile?.games_played || 0}</div>
           <div className="text-xs text-primary-300 mt-1">Oyun</div>
         </div>
       </div>

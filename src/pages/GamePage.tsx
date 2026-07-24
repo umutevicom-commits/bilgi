@@ -8,7 +8,7 @@ import { playTick, playTimeUp } from '../lib/sound'
 import { vibrateTick, vibrateTimeUp } from '../lib/haptics'
 import {
   primeVoice, isVoiceEnabled, setVoiceEnabled,
-  announceQuestion, announceUrgent, announceCorrect, announceWrong, announceTimeout,
+  announceUrgent, announceCorrect, announceWrong, announceTimeout,
   announceGameEnd, stopSpeaking,
 } from '../lib/voiceAnnouncer'
 import { DIFFICULTY_LABELS, DIFFICULTY_POINTS, DIFFICULTY_COLORS } from '../types'
@@ -26,7 +26,7 @@ function getOptionTextByKey(q: Question, key: 'A' | 'B' | 'C' | 'D'): string {
 }
 
 // Doğru cevaptan sonra kaç saniye içinde bir sonraki soruya otomatik geçilecek
-const AUTO_ADVANCE_SECONDS_CORRECT = 3
+const AUTO_ADVANCE_SECONDS_CORRECT = 5
 // Yanlış/süre dolduğunda doğru cevabı okuyabilmesi için biraz daha uzun süre
 const AUTO_ADVANCE_SECONDS_WRONG = 5
 // Geri sayımın bu saniyeden itibaren "kritik" (titreşim + tık sesi) sayılacağı eşik
@@ -155,17 +155,12 @@ export default function GamePage() {
     primeVoice()
   }, [])
 
-  // Yeni soru geldiğinde: soruyu ve ardından A/B/C/D şıklarını sırayla oku.
-  // Aynı soru için (showResult açılıp kapansa bile) yalnızca BİR kez okunur.
-  const announcedQuestionIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (loading || showResult || !question) return
-    if (announcedQuestionIdRef.current === question.id) return
-    announcedQuestionIdRef.current = question.id
-    announceQuestion(question.question_text, [
-      question.option_a, question.option_b, question.option_c, question.option_d,
-    ])
-  }, [loading, showResult, question])
+  // NOT: Soru metni ve A/B/C/D şıkları ekranda zaten yazılı olarak
+  // gösterildiği için (altyazı niteliğinde), TTS bunları sesli olarak
+  // AYRICA okumuyor. Sesli anlatıcı yalnızca ekranda yazılı olarak
+  // bulunmayan yorum/tepkileri (kritik süre uyarısı, doğru/yanlış/süre
+  // doldu tepkisi, oyun sonu değerlendirmesi) seslendiriyor.
+  // (Bkz. announceQuestion çağrısının kasıtlı olarak kaldırıldığı yer.)
 
   // Süre azaldıkça akıllıca yorum yapsın: sadece 10. ve 5. saniyede (her
   // saniye konuşursa soru okumasıyla üst üste biner, rahatsız edici olur).
@@ -279,7 +274,7 @@ export default function GamePage() {
         <div className="flex items-center gap-2">
           <div className="glass-card px-3 py-1.5 flex items-center gap-2">
             <Trophy size={16} className="text-accent-400" />
-            <span className="text-cream-100 font-semibold">{session.current_points}</span>
+            <span className="text-cream-100 font-semibold tabular-nums">{session.current_points}</span>
             <span className="text-primary-400 text-sm">puan</span>
           </div>
           {streak >= 3 && (
@@ -297,7 +292,7 @@ export default function GamePage() {
       {/* Question Info */}
       <div className="flex items-center justify-between mb-4 text-sm">
         <div className="text-primary-300">
-          Soru <span className="text-cream-100 font-bold">{session.current_question_number}</span>
+          Soru <span className="text-cream-100 font-bold tabular-nums">{session.current_question_number}</span>
         </div>
         <div className={`font-semibold ${DIFFICULTY_COLORS[currentDifficulty]}`}>
           {DIFFICULTY_LABELS[currentDifficulty]} ({DIFFICULTY_POINTS[currentDifficulty]} puan)
@@ -323,7 +318,7 @@ export default function GamePage() {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl font-bold" style={{ color: timerColor }}>
+            <span className="text-2xl font-bold font-mono tabular-nums" style={{ color: timerColor }}>
               {timeLeft}
             </span>
           </div>
@@ -450,7 +445,7 @@ export default function GamePage() {
             {isCorrect ? (
               <>
                 <p className="text-success-400 font-bold text-lg mb-2">Doğru!</p>
-                <p className="text-primary-300 text-sm">
+                <p className="text-primary-300 text-sm tabular-nums">
                   +{DIFFICULTY_POINTS[currentDifficulty]} puan kazandınız
                 </p>
                 {question.explanation && (
@@ -475,7 +470,7 @@ export default function GamePage() {
                   {selectedAnswer === 'timeout' ? 'Süre Doldu!' : 'Yanlış!'}
                 </p>
                 <p className="text-primary-300 text-sm">
-                  Doğru cevap: {question.correct_answer}
+                  Doğru cevap: {getOptionTextByKey(question, question.correct_answer)}
                 </p>
                 {question.explanation && (
                   <p className="text-primary-400 text-xs mt-2 italic break-anywhere">{question.explanation}</p>
@@ -538,11 +533,11 @@ export default function GamePage() {
               className="glass-card p-8 max-w-md w-full text-center glow-accent"
             >
               <Trophy size={48} className="text-accent-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-cream-100 mb-2">Oyun Bitti</h2>
+              <h2 className="text-2xl font-bold text-foil mb-2">Oyun Bitti</h2>
               <p className="text-primary-300 mb-4">
                 {session.current_question_number} soru cevapladınız
               </p>
-              <div className="text-4xl font-bold text-accent-400 mb-6">
+              <div className="text-4xl font-bold text-accent-400 tabular-nums mb-6">
                 {session.current_points} puan
               </div>
               <div className="flex flex-col gap-2">

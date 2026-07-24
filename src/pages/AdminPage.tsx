@@ -541,7 +541,7 @@ function StatCard({ label, value, icon: Icon, color }: {
   return (
     <div className="glass-card p-4 text-center">
       <Icon size={24} className={`${color} mx-auto mb-2`} />
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
       <div className="text-xs text-primary-400 mt-1">{label}</div>
     </div>
   )

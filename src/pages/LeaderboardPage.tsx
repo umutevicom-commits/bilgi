@@ -159,7 +159,7 @@ export default function LeaderboardPage() {
     if (rank === 1) return <Crown size={20} className="text-accent-400" />
     if (rank === 2) return <Trophy size={18} className="text-primary-300" />
     if (rank === 3) return <Award size={18} className="text-cream-400" />
-    return <span className="text-primary-400 font-bold text-sm">{rank}</span>
+    return <span className="text-primary-400 font-bold text-sm tabular-nums">{rank}</span>
   }
 
   return (
@@ -264,7 +264,7 @@ export default function LeaderboardPage() {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-accent-400 font-bold">
+                <div className="text-accent-400 font-bold tabular-nums">
                   {period === 'all' ? entry.total_points : entry.recent_score}
                 </div>
                 <div className="text-xs text-primary-400">puan</div>
