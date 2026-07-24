@@ -59,6 +59,7 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         serif: ['Georgia', 'Cambria', 'Times New Roman', 'serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+        display: ['Fraunces', 'Georgia', 'Cambria', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
@@ -72,6 +73,8 @@ export default {
         'bounce-in': 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'timer-shake': 'timerShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite',
         'skeleton-shimmer': 'skeletonShimmer 1.6s ease-in-out infinite',
+        'foil-sheen': 'foilSheen 5s ease-in-out infinite',
+        'spotlight-drift': 'spotlightDrift 12s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -118,6 +121,14 @@ export default {
           '0%': { opacity: '0.5' },
           '50%': { opacity: '0.9' },
           '100%': { opacity: '0.5' },
+        },
+        foilSheen: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        spotlightDrift: {
+          '0%, 100%': { transform: 'translate(-50%, 0) scale(1)', opacity: '0.55' },
+          '50%': { transform: 'translate(-50%, 10px) scale(1.06)', opacity: '0.75' },
         },
       },
     },
