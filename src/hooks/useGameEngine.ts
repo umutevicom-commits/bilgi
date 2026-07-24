@@ -6,7 +6,7 @@ import { loadSeenQuestions, markQuestionSeen } from '../lib/seenQuestions'
 import type { Question, GameSession, DifficultyLevel } from '../types'
 import { DIFFICULTY_ORDER, DIFFICULTY_POINTS } from '../types'
 
-const QUESTION_TIME = 45
+const QUESTION_TIME = 120
 
 export function useGameEngine(category: string) {
   const { user, profile, refreshProfile } = useAuth()
