@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-26T13:36:39.087Z",
-  "total": 503,
+  "generated_at": "2026-07-26T19:22:40.565Z",
+  "total": 506,
   "questions": [
     {
       "id": "genel-kultur-kolay-1784815684982-tyn3xq64",
@@ -8049,6 +8049,54 @@
       "source_title": "Türkiye'de kürtaj",
       "is_active": true,
       "created_at": "2026-07-26T13:35:13.372Z"
+    },
+    {
+      "id": "guncel-kolay-1785093384071-brk2m1ho",
+      "category": "guncel",
+      "difficulty": "kolay",
+      "question_text": "ASELSAN 1919 ile ilgili aşağıdaki bilgide boş bırakılan yıl hangisidir? (\"Aselsan ____, ASELSAN tarafından 1997'de Türkiye'de piyasaya sunulan ilk yerli cep telefonu.\")",
+      "option_a": "1860",
+      "option_b": "1936",
+      "option_c": "1919",
+      "option_d": "1867",
+      "correct_answer": "C",
+      "explanation": "Aselsan 1919, ASELSAN tarafından 1997'de Türkiye'de piyasaya sunulan ilk yerli cep telefonu.",
+      "source_url": "https://tr.wikipedia.org/wiki/ASELSAN_1919",
+      "source_title": "ASELSAN 1919",
+      "is_active": true,
+      "created_at": "2026-07-26T19:16:24.071Z"
+    },
+    {
+      "id": "guncel-zor-1785093444201-hp6ju53r",
+      "category": "guncel",
+      "difficulty": "zor",
+      "question_text": "Türkiye başbakanı ile ilgili aşağıdaki bilgide boş bırakılan yıl hangisidir? (\"Başbakanlık, ____ anayasa değişikliği referandumunun ardından yapılan 2018 genel seçimleri ile birlikte kaldırıldı.\")",
+      "option_a": "2017",
+      "option_b": "2016",
+      "option_c": "2027",
+      "option_d": "2003",
+      "correct_answer": "A",
+      "explanation": "Başbakanlık, 2017 anayasa değişikliği referandumunun ardından yapılan 2018 genel seçimleri ile birlikte kaldırıldı.",
+      "source_url": "https://tr.wikipedia.org/wiki/T%C3%BCrkiye_ba%C5%9Fbakan%C4%B1",
+      "source_title": "Türkiye başbakanı",
+      "is_active": true,
+      "created_at": "2026-07-26T19:17:24.201Z"
+    },
+    {
+      "id": "guncel-profesyonel-1785093486284-ajqxbjwm",
+      "category": "guncel",
+      "difficulty": "profesyonel",
+      "question_text": "Lübnan pasaportu hakkındaki bilgiye göre doğru yıl hangisidir? (\"Şubat ____'da Lübnan İçişleri Bakanı'nın verdiği bilgilere göre, elektronik pasaporta geçiş için hazırlanılmaktadır.\")",
+      "option_a": "2009",
+      "option_b": "2014",
+      "option_c": "2008",
+      "option_d": "2011",
+      "correct_answer": "A",
+      "explanation": "Şubat 2009'da Lübnan İçişleri Bakanı'nın verdiği bilgilere göre, elektronik pasaporta geçiş için hazırlanılmaktadır.",
+      "source_url": "https://tr.wikipedia.org/wiki/L%C3%BCbnan_pasaportu",
+      "source_title": "Lübnan pasaportu",
+      "is_active": true,
+      "created_at": "2026-07-26T19:18:06.284Z"
     }
   ]
 }
