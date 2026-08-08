@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-08T12:55:12.268Z",
-  "total": 1591,
+  "generated_at": "2026-08-08T18:47:24.528Z",
+  "total": 1595,
   "questions": [
     {
       "id": "genel-kultur-kolay-1784815684982-tyn3xq64",
@@ -25457,6 +25457,70 @@
       "source_title": "Türkiye'deki devlet liseleri listesi",
       "is_active": true,
       "created_at": "2026-08-08T06:57:22.897Z"
+    },
+    {
+      "id": "genel-kultur-profesyonel-1786214474650-u0rgqv31",
+      "category": "genel-kultur",
+      "difficulty": "profesyonel",
+      "question_text": "Aşağıdakilerden hangisi Sarı Uygurlar hakkında doğru bir bilgidir?",
+      "option_a": "Sergey Yefimoviç Malov, Rus dilbilimci, Doğu bilimci, Türkolog, SSCB Bilimler Akademisi muhabir üyesi.",
+      "option_b": "Burhan Uygur Türk ressam.",
+      "option_c": "Yugurların çoğu Türk dili, doğu eyaletlerinde ise Moğolca ve Çince konuşurlar.",
+      "option_d": "Karahoca Uygur Krallığı, 9.-13. yüzyıllarda bugünkü Sincan Uygur Özerk Bölgesi'nde Uygurların egemenliğinde var olmuş devlet.",
+      "correct_answer": "C",
+      "explanation": "Bu bilgi, Wikipedia kaynağından derlenmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Sar%C4%B1_Uygurlar",
+      "source_title": "Sarı Uygurlar",
+      "is_active": true,
+      "created_at": "2026-08-08T18:41:14.650Z"
+    },
+    {
+      "id": "genel-kultur-kolay-1786214477702-4lgnwan1",
+      "category": "genel-kultur",
+      "difficulty": "kolay",
+      "question_text": "Yedisu bölgesi ile ilgili doğru ifade aşağıdakilerden hangisidir?",
+      "option_a": "Şenköy, Bingöl ilinin Yedisu ilçesine bağlı bir köydür.",
+      "option_b": "Yedisu, Bingöl iline bağlı bir ilçedir.",
+      "option_c": "Kangar Birliği, günümüz Kazakistan topraklarında kurulmuş bir Türk devletiydi.",
+      "option_d": "Yedisu bölgesi, Orta Asya'da günümüzde Kazakistan'nın güney-doğu parçası olan bir bölgedir.",
+      "correct_answer": "D",
+      "explanation": "Bu bilgi, Wikipedia kaynağından derlenmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Yedisu_b%C3%B6lgesi",
+      "source_title": "Yedisu bölgesi",
+      "is_active": true,
+      "created_at": "2026-08-08T18:41:17.702Z"
+    },
+    {
+      "id": "genel-kultur-zor-1786214484039-ff5541s0",
+      "category": "genel-kultur",
+      "difficulty": "zor",
+      "question_text": "Uygurlar ile ilgili doğru ifade aşağıdakilerden hangisidir?",
+      "option_a": "Çin'in kuzeybatısındaki Sincan Uygur Özerk Bölgesi, Uygurların memleketi olarak tanınır.",
+      "option_b": "Uygur Kağanlığı, 8.ve 9. yüzyılların ortaları arasında yaklaşık bir yüzyıl boyunca var olan bir Türk imparatorluğuydu.",
+      "option_c": "Karahoca Uygur Krallığı, 9.-13. yüzyıllarda bugünkü Sincan Uygur Özerk Bölgesi'nde Uygurların egemenliğinde var olmuş devlet.",
+      "option_d": "Başkenti Urumçi, resmî dilleri Uygurca ve Standart Çincedir.",
+      "correct_answer": "A",
+      "explanation": "Bu bilgi, Wikipedia kaynağından derlenmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Uygurlar",
+      "source_title": "Uygurlar",
+      "is_active": true,
+      "created_at": "2026-08-08T18:41:24.039Z"
+    },
+    {
+      "id": "genel-kultur-profesyonel-1786214547945-i276mdks",
+      "category": "genel-kultur",
+      "difficulty": "profesyonel",
+      "question_text": "Askar Mamin ile ilgili aşağıdaki bilgide boş bırakılan yıl hangisidir? (\"Amanat partisi üyesidir. ____ Kazakistan protestoları sırasında hükûmeti istifa etmiştir.\")",
+      "option_a": "2020",
+      "option_b": "2017",
+      "option_c": "2022",
+      "option_d": "2019",
+      "correct_answer": "C",
+      "explanation": "Amanat partisi üyesidir. 2022 Kazakistan protestoları sırasında hükûmeti istifa etmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Askar_Mamin",
+      "source_title": "Askar Mamin",
+      "is_active": true,
+      "created_at": "2026-08-08T18:42:27.945Z"
     }
   ]
 }
