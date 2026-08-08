@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-08T01:51:57.674Z",
-  "total": 1589,
+  "generated_at": "2026-08-08T07:02:48.087Z",
+  "total": 1591,
   "questions": [
     {
       "id": "genel-kultur-kolay-1784815684982-tyn3xq64",
@@ -25425,6 +25425,38 @@
       "source_title": "Koca Davud Paşa",
       "is_active": true,
       "created_at": "2026-08-08T01:49:02.511Z"
+    },
+    {
+      "id": "genel-kultur-profesyonel-1786172240023-rjq9rbwu",
+      "category": "genel-kultur",
+      "difficulty": "profesyonel",
+      "question_text": "Bağlıca, Amasya ile ilgili doğru ifade aşağıdakilerden hangisidir?",
+      "option_a": "Türkiye'deki devlet liselerinin illere göre Şubat 2024 listesi aşağıdadır.",
+      "option_b": "Yozgat, Türkiye'nin İç Anadolu Bölgesinde yer alan bir ildir.",
+      "option_c": "Bu madde ilçelere göre Amasya ilindeki yerleşim yerleri listesidir.",
+      "option_d": "Bağlıca, Amasya ilinin Merkez ilçesine bağlı bir köydür.",
+      "correct_answer": "D",
+      "explanation": "Bu bilgi, Wikipedia kaynağından derlenmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Ba%C4%9Fl%C4%B1ca%2C_Amasya",
+      "source_title": "Bağlıca, Amasya",
+      "is_active": true,
+      "created_at": "2026-08-08T06:57:20.024Z"
+    },
+    {
+      "id": "genel-kultur-zor-1786172242897-55dxz29v",
+      "category": "genel-kultur",
+      "difficulty": "zor",
+      "question_text": "Türkiye'deki devlet liseleri listesi hakkındaki bilgiye göre doğru yıl hangisidir? (\"Türkiye'deki devlet liselerinin illere göre Şubat ____ listesi aşağıdadır.\")",
+      "option_a": "2013",
+      "option_b": "2024",
+      "option_c": "2006",
+      "option_d": "2025",
+      "correct_answer": "B",
+      "explanation": "Türkiye'deki devlet liselerinin illere göre Şubat 2024 listesi aşağıdadır.",
+      "source_url": "https://tr.wikipedia.org/wiki/T%C3%BCrkiye'deki_devlet_liseleri_listesi",
+      "source_title": "Türkiye'deki devlet liseleri listesi",
+      "is_active": true,
+      "created_at": "2026-08-08T06:57:22.897Z"
     }
   ]
 }
