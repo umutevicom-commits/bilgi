@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-07T19:04:06.536Z",
-  "total": 1584,
+  "generated_at": "2026-08-08T01:51:57.674Z",
+  "total": 1589,
   "questions": [
     {
       "id": "genel-kultur-kolay-1784815684982-tyn3xq64",
@@ -25345,6 +25345,86 @@
       "source_title": "Mine Çerçi",
       "is_active": true,
       "created_at": "2026-08-07T13:17:10.970Z"
+    },
+    {
+      "id": "genel-kultur-zor-1786153582940-46op0k86",
+      "category": "genel-kultur",
+      "difficulty": "zor",
+      "question_text": "Arap Camii (Drama) ile ilgili aşağıdaki bilgide boş bırakılan yıl hangisidir? (\"Neredeyse bir asırdır bakımsız bırakılan camide, Kasım ____ itibarıyla restorasyon çalışmaları başlatıldı.\")",
+      "option_a": "2023",
+      "option_b": "2027",
+      "option_c": "2022",
+      "option_d": "2008",
+      "correct_answer": "C",
+      "explanation": "Neredeyse bir asırdır bakımsız bırakılan camide, Kasım 2022 itibarıyla restorasyon çalışmaları başlatıldı.",
+      "source_url": "https://tr.wikipedia.org/wiki/Arap_Camii_(Drama)",
+      "source_title": "Arap Camii (Drama)",
+      "is_active": true,
+      "created_at": "2026-08-08T01:46:22.941Z"
+    },
+    {
+      "id": "genel-kultur-zor-1786153643864-36uwdw4d",
+      "category": "genel-kultur",
+      "difficulty": "zor",
+      "question_text": "1917 (film, 2019) hakkındaki bilgiye göre doğru yıl hangisidir? (\"____, Sam Mendes tarafından yönetilen ve yapımcılığı üstlenilen, 2019 yapımı bir İngiliz savaş filmidir.\")",
+      "option_a": "1917",
+      "option_b": "1933",
+      "option_c": "1925",
+      "option_d": "1915",
+      "correct_answer": "A",
+      "explanation": "1917, Sam Mendes tarafından yönetilen ve yapımcılığı üstlenilen, 2019 yapımı bir İngiliz savaş filmidir.",
+      "source_url": "https://tr.wikipedia.org/wiki/1917_(film%2C_2019)",
+      "source_title": "1917 (film, 2019)",
+      "is_active": true,
+      "created_at": "2026-08-08T01:47:23.864Z"
+    },
+    {
+      "id": "genel-kultur-cok_zor-1786153695236-yqbxlisy",
+      "category": "genel-kultur",
+      "difficulty": "cok_zor",
+      "question_text": "Safevîlik ile ilgili doğru ifade aşağıdakilerden hangisidir?",
+      "option_a": "Erdebil, Hazar Denizi'nin güney batı kıyısında, günümüzde İran'ın kuzey batı bölgesinde yer alan bir kenttir.",
+      "option_b": "Şebekler, Şahbekler ya da Şahbaylar,; Irak'ın kuzeyinde, Musul ve çevresinde yaşayan bir topluluk.",
+      "option_c": "Şeyh Haydar,, Safeviye Tarikatından Şeyh Cüneyd'in oğludur.",
+      "option_d": "Tarikat veya tarik kelimesi \"yol\" tarikat \"yollar\" anlamına gelir, \"Allah'a ulaştıran yol\" manasında kullanılmaktadır.",
+      "correct_answer": "A",
+      "explanation": "Bu bilgi, Wikipedia kaynağından derlenmiştir.",
+      "source_url": "https://tr.wikipedia.org/wiki/Safev%C3%AElik",
+      "source_title": "Safevîlik",
+      "is_active": true,
+      "created_at": "2026-08-08T01:48:15.236Z"
+    },
+    {
+      "id": "genel-kultur-cok_zor-1786153740826-epnjippe",
+      "category": "genel-kultur",
+      "difficulty": "cok_zor",
+      "question_text": "Hadım Süleyman Paşa hakkındaki bilgiye göre doğru yıl hangisidir? (\"Süleyman saltanatı döneminde Nisan ____-28 Kasım 1544 arasında sadrazamlık yapmış Rum asıllı Osmanlı komutanı ve devlet adamıdır.\")",
+      "option_a": "1545",
+      "option_b": "1538",
+      "option_c": "1549",
+      "option_d": "1541",
+      "correct_answer": "D",
+      "explanation": "Süleyman saltanatı döneminde Nisan 1541-28 Kasım 1544 arasında sadrazamlık yapmış Rum asıllı Osmanlı komutanı ve devlet adamıdır.",
+      "source_url": "https://tr.wikipedia.org/wiki/Had%C4%B1m_S%C3%BCleyman_Pa%C5%9Fa",
+      "source_title": "Hadım Süleyman Paşa",
+      "is_active": true,
+      "created_at": "2026-08-08T01:49:00.826Z"
+    },
+    {
+      "id": "genel-kultur-profesyonel-1786153742511-ein93x2z",
+      "category": "genel-kultur",
+      "difficulty": "profesyonel",
+      "question_text": "Koca Davud Paşa ile ilgili aşağıdaki bilgide boş bırakılan yıl hangisidir? (\"Bayezid saltanatında ____-1497 yılları arasında sadrazamlık yapmış Osmanlı devlet adamıdır.\")",
+      "option_a": "1486",
+      "option_b": "1484",
+      "option_c": "1478",
+      "option_d": "1483",
+      "correct_answer": "D",
+      "explanation": "Bayezid saltanatında 1483-1497 yılları arasında sadrazamlık yapmış Osmanlı devlet adamıdır.",
+      "source_url": "https://tr.wikipedia.org/wiki/Koca_Davud_Pa%C5%9Fa",
+      "source_title": "Koca Davud Paşa",
+      "is_active": true,
+      "created_at": "2026-08-08T01:49:02.511Z"
     }
   ]
 }
